@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
     cout << "=== TP2 – Busca Direta (findrec) ===" << endl;
 
     if (argc < 2) {
-        cerr << "Uso: ./findrec <id>" << endl;
+        cerr << "Uso: ./bin/findrec <id>" << endl;
         return 1;
     }
 
@@ -20,7 +20,11 @@ int main(int argc, char* argv[]) {
     cout << "Arquivo de dados: " << dbPath << endl;
     cout << "Procurando registro com ID = " << id << endl;
 
-    HashFile hashFile(dbPath, 100, 4);
+    // ⚠️ Deve bater com o que foi usado no upload
+    const int NUM_BUCKETS = 97;
+    const int BUCKET_SIZE = 4096;
+
+    HashFile hashFile(dbPath, NUM_BUCKETS, BUCKET_SIZE);
     Registro r;
 
     auto inicio = chrono::high_resolution_clock::now();
@@ -28,25 +32,25 @@ int main(int argc, char* argv[]) {
     auto fim = chrono::high_resolution_clock::now();
 
     double tempoMs = chrono::duration<double, milli>(fim - inicio).count();
-    int blocos = hashFile.getBlocosLidos();
 
     if (encontrado) {
-        cout << "\n✅ Registro encontrado:" << endl;
-        cout << "ID: " << r.id << endl;
-        cout << "Título: " << r.titulo << endl;
-        cout << "Ano: " << r.ano << endl;
-        cout << "Autores: " << r.autores << endl;
-        cout << "Citações: " << r.citacoes << endl;
-        cout << "Atualização: " << r.data_atualizacao << endl;
-        cout << "Snippet: " << r.snippet << endl;
+        cout << "\n✅ Registro encontrado:\n";
+        cout << "ID: " << r.id << "\n";
+        cout << "Título: " << r.titulo << "\n";
+        cout << "Ano: " << r.ano << "\n";
+        cout << "Autores: " << r.autores << "\n";
+        cout << "Citações: " << r.citacoes << "\n";
+        cout << "Atualização: " << r.data_atualizacao << "\n";
+        cout << "Snippet: " << r.snippet << "\n";
     } else {
-        cout << "\n❌ Registro não encontrado." << endl;
+        cout << "\n❌ Registro não encontrado.\n";
     }
 
-    cout << "\n📊 Estatísticas:" << endl;
-    cout << "Blocos lidos: " << blocos << endl;
+    cout << "\n📊 Estatísticas:\n";
     cout << fixed << setprecision(2);
-    cout << "Tempo de execução: " << tempoMs << " ms" << endl;
+    cout << "Tempo de execução: " << tempoMs << " ms\n";
+    cout << "Blocos lidos (registros): " << hashFile.getBlocosLidos() << "\n";
+    cout << "Total de blocos no arquivo: " << hashFile.getTotalBlocos() << "\n";
 
     return 0;
 }

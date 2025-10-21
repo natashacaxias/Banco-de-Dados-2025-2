@@ -1,129 +1,142 @@
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <chrono>
-#include <iomanip>
+#include <bits/stdc++.h>
 #include <cstring>
-#include <cstdio>
-#include <vector>
 #include "../include/hashfile.h"
-
 using namespace std;
 
-// ============================================================
-// Função auxiliar: divide uma linha CSV respeitando aspas
-// ============================================================
-vector<string> splitCSV(const string& line, char delimiter) {
-    vector<string> campos;
-    string campo;
-    bool dentroAspas = false;
+const int BATCH_SIZE = 10000;
+const int PROGRESS_STEP = 50000;
 
-    for (char c : line) {
-        if (c == '"') {
-            dentroAspas = !dentroAspas;
-        } else if (c == delimiter && !dentroAspas) {
-            campos.push_back(campo);
-            campo.clear();
-        } else {
-            campo += c;
-        }
-    }
-    campos.push_back(campo);
-
-    // Limpa aspas e \r
-    for (auto& f : campos) {
-        if (!f.empty() && f.front() == '"') f.erase(0, 1);
-        if (!f.empty() && f.back() == '"')  f.pop_back();
-        if (!f.empty() && f.back() == '\r') f.pop_back();
-    }
-
-    return campos;
+// converte linha CSV → Registro fixo
+Registro toRegistro(const RegistroCSV& csv) {
+    Registro r{};
+    r.id = csv.id;
+    strncpy(r.titulo, csv.titulo.c_str(), sizeof(r.titulo) - 1);
+    strncpy(r.ano, csv.ano.c_str(), sizeof(r.ano) - 1);
+    strncpy(r.autores, csv.autores.c_str(), sizeof(r.autores) - 1);
+    strncpy(r.citacoes, csv.citacoes.c_str(), sizeof(r.citacoes) - 1);
+    strncpy(r.data_atualizacao, csv.data_atualizacao.c_str(), sizeof(r.data_atualizacao) - 1);
+    strncpy(r.snippet, csv.snippet.c_str(), sizeof(r.snippet) - 1);
+    r.prox = -1;
+    return r;
 }
 
-// ============================================================
-// Programa principal: lê o CSV e popula o arquivo hash
-// ============================================================
+// faz o parse da linha CSV separada por ';'
+RegistroCSV parseCSV(const string &linha) {
+    RegistroCSV reg{};
+    stringstream ss(linha);
+    string campo;
+    vector<string> campos;
+
+    while (getline(ss, campo, ';')) {
+        if (!campo.empty() && campo.front() == '"')
+            campo.erase(0, 1);
+        if (!campo.empty() && campo.back() == '"')
+            campo.pop_back();
+        campos.push_back(campo);
+    }
+
+    if (campos.size() < 7) {
+        reg.id = 0;
+        return reg;
+    }
+
+    try { reg.id = stoi(campos[0]); } catch (...) { reg.id = 0; }
+    reg.titulo = campos[1];
+    reg.ano = campos[2];
+    reg.autores = campos[3];
+    reg.citacoes = campos[4];
+    reg.data_atualizacao = campos[5];
+    reg.snippet = campos[6];
+
+    return reg;
+}
+
 int main(int argc, char* argv[]) {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    cout.setf(std::ios::unitbuf); // força flush automático
+
     if (argc < 2) {
-        cerr << "Uso: ./upload <arquivo.csv> ou <arquivo.csv.gz>" << endl;
+        cerr << "Uso: ./bin/upload <arquivo.csv>\n";
         return 1;
     }
 
-    string inputPath = argv[1];
-    string dbPath = "/data/data.db";
-
-    cout << "=== TP2 – Upload de Dados com Hashing ===" << endl;
-    cout << "Arquivo de entrada: " << inputPath << endl;
-    cout << "Arquivo de dados: " << dbPath << endl;
-
-    HashFile hashFile(dbPath, 100, 4);
-    if (!hashFile.criarArquivoVazio()) {
-        cerr << "Erro ao criar arquivo de dados." << endl;
+    string caminhoCSV = argv[1];
+    ifstream arquivo(caminhoCSV);
+    if (!arquivo.is_open()) {
+        cerr << "❌ Erro ao abrir arquivo CSV: " << caminhoCSV << endl;
         return 1;
     }
 
-    FILE* fp = nullptr;
-    if (inputPath.find(".gz") != string::npos)
-        fp = popen(("gzip -dc " + inputPath).c_str(), "r");
-    else
-        fp = fopen(inputPath.c_str(), "r");
+    cout << "🚀 Iniciando upload interativo do arquivo: " << caminhoCSV << "\n";
+    cout << "--------------------------------------------------------\n";
 
-    if (!fp) {
-        cerr << "Erro ao abrir arquivo: " << inputPath << endl;
-        return 1;
+    const int NUM_BUCKETS = 97;
+    const int BUCKET_SIZE = 4096;
+    HashFile hashFile("./data/data.db", NUM_BUCKETS, BUCKET_SIZE);
+    hashFile.criarArquivoVazio();
+
+    vector<Registro> buffer;
+    buffer.reserve(BATCH_SIZE);
+
+    long totalLinhas = 0, inseridos = 0, invalidos = 0;
+    {
+        ifstream temp(caminhoCSV);
+        totalLinhas = count(istreambuf_iterator<char>(temp),
+                            istreambuf_iterator<char>(), '\n');
     }
+    cout << "📊 Total de linhas detectadas: " << totalLinhas << "\n\n";
 
-    char buffer[16384];
+    auto start = chrono::high_resolution_clock::now();
     string linha;
-    int count = 0;
 
-    // intervalo de debug configurável via variável de ambiente
-    const char* stepEnv = getenv("DEBUG_EVERY");
-    int STEP = stepEnv ? max(1, atoi(stepEnv)) : 10000;
+    cout << "📦 Iniciando leitura e inserção..." << endl;
 
-    auto inicio = chrono::high_resolution_clock::now();
-
-    while (fgets(buffer, sizeof(buffer), fp)) {
-        linha = buffer;
+    while (getline(arquivo, linha)) {
         if (linha.empty()) continue;
 
-        char delim = (linha.find(';') != string::npos) ? ';' : ',';
-        auto campos = splitCSV(linha, delim);
-        if (campos.size() < 7) continue;
+        RegistroCSV csv = parseCSV(linha);
+        if (csv.id == 0) { invalidos++; continue; }
 
-        Registro r;
-        memset(&r, 0, sizeof(Registro));
+        buffer.push_back(toRegistro(csv));
+        inseridos++;
 
-        try { r.id = stoi(campos[0]); } catch (...) { r.id = -1; }
-        try { r.ano = stoi(campos[2]); } catch (...) { r.ano = 0; }
-        try { r.citacoes = stoi(campos[4]); } catch (...) { r.citacoes = 0; }
+        if (buffer.size() >= BATCH_SIZE) {
+            hashFile.inserirEmLote(buffer);
+            buffer.clear();
+        }
 
-        strncpy(r.titulo, campos[1].c_str(), sizeof(r.titulo) - 1);
-        strncpy(r.autores, campos[3].c_str(), sizeof(r.autores) - 1);
-        strncpy(r.data_atualizacao, campos[5].c_str(), sizeof(r.data_atualizacao) - 1);
-        strncpy(r.snippet, campos[6].c_str(), sizeof(r.snippet) - 1);
-
-        r.prox = -1;
-        hashFile.inserir(r);
-        count++;
-
-        // Log progressivo
-        if (count % STEP == 0) {
-            cout << "Inseridos: " << count << " registros..." << endl;
+        if (inseridos % PROGRESS_STEP == 0) {
+            auto now = chrono::high_resolution_clock::now();
+            double elapsed = chrono::duration<double>(now - start).count();
+            double percent = (100.0 * inseridos) / totalLinhas;
+            double speed = inseridos / elapsed;
+            cout << fixed << setprecision(1);
+            cout << "⏱️ " << setw(7) << elapsed << "s | "
+                 << setw(8) << inseridos << "/" << totalLinhas
+                 << " (" << percent << "%) — "
+                 << (int)speed << " regs/s\n" << flush;
         }
     }
 
-    pclose(fp);
+    if (!buffer.empty())
+        hashFile.inserirEmLote(buffer);
 
-    auto fim = chrono::high_resolution_clock::now();
-    double tempoMs = chrono::duration<double, milli>(fim - inicio).count();
+    auto end = chrono::high_resolution_clock::now();
+    double totalTime = chrono::duration<double>(end - start).count();
 
-    cout << "\nUpload concluído!" << endl;
-    cout << "Registros inseridos: " << count << endl;
-    cout << fixed << setprecision(2);
-    cout << "Tempo total: " << tempoMs << " ms" << endl;
-    cout << "Arquivo salvo em: " << dbPath << endl;
+    cout << "\n✅ Upload concluído!\n";
+    cout << "📈 Registros válidos: " << inseridos
+         << " | ⚠️ Inválidos: " << invalidos << "\n";
+    cout << "⏱️ Tempo total: " << fixed << setprecision(2)
+         << totalTime << " s\n";
+    if (totalTime > 0)
+        cout << "🚀 Velocidade média: " << (int)(inseridos / totalTime)
+             << " regs/s\n";
 
-    return 0;
+    cout << "💾 Total de blocos no arquivo: "
+         << hashFile.getTotalBlocos() << endl;
+
+    cout << "--------------------------------------------------------\n";
+    cout << "Arquivo salvo em: /data/data.db\n";
 }

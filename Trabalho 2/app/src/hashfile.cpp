@@ -1,157 +1,131 @@
-#include "../include/hashfile.h"
-#include <iostream>
-#include <fstream>
-#include <cstring>
-#include <cstdlib>
+#include "hashfile.h"
+#include <bits/stdc++.h>
+#include <unistd.h>
+#include <fcntl.h>
 using namespace std;
 
-static long insertCount = 0;  // contador global de inserções
+static inline long long regSize() { return static_cast<long long>(sizeof(Registro)); }
 
 HashFile::HashFile(string path, int nb, int bs)
-    : path(path), numBuckets(nb), bucketSize(bs), blocosLidos(0) {}
+    : filePath(std::move(path)), numBuckets(nb), bucketSize(bs) {}
 
-int HashFile::hashFunction(int key) {
-    return key % numBuckets;
+long long HashFile::fileSizeBytes() const {
+    ifstream f(filePath, ios::binary | ios::ate);
+    if (!f.is_open()) return 0;
+    return static_cast<long long>(f.tellg());
 }
 
-bool HashFile::criarArquivoVazio() {
-    fstream file(path, ios::out | ios::binary | ios::trunc);
-    if (!file) return false;
+// Criação instantânea via ftruncate
+void HashFile::criarArquivoVazio() {
+    int fd = open(filePath.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+    if (fd == -1) {
+        perror("❌ Erro ao criar arquivo de dados");
+        return;
+    }
+    off_t tamanho = (off_t)numBuckets * bucketSize * sizeof(Registro);
+    if (ftruncate(fd, tamanho) != 0) {
+        perror("❌ Erro no ftruncate");
+    } else {
+        cout << "📁 Arquivo de dados alocado com "
+             << (tamanho / (1024.0 * 1024.0)) << " MB." << endl;
+    }
+    close(fd);
+}
 
-    Registro vazio;
-    memset(&vazio, 0, sizeof(Registro));
-    vazio.id = -1;
-    vazio.prox = -1;
+int HashFile::hashFunction(int key) const {
+    int m = numBuckets > 0 ? numBuckets : 1;
+    int h = key % m;
+    return (h < 0 ? h + m : h);
+}
 
-    for (int i = 0; i < numBuckets * bucketSize; i++)
-        file.write(reinterpret_cast<char*>(&vazio), sizeof(Registro));
+// Inserção em lote ultra-rápida: escrita sequencial bucket a bucket
+void HashFile::inserirEmLote(const vector<Registro>& regs) {
+    if (regs.empty()) return;
+
+    // Agrupar registros por bucket
+    vector<vector<Registro>> buckets(numBuckets);
+    for (const auto& r : regs) {
+        int b = hashFunction(r.id);
+        buckets[b].push_back(r);
+    }
+
+    fstream file(filePath, ios::in | ios::out | ios::binary);
+    if (!file.is_open()) {
+        cerr << "❌ Erro ao abrir arquivo de dados: " << filePath << endl;
+        return;
+    }
+
+    const long long tamRegistro = sizeof(Registro);
+
+    for (int b = 0; b < numBuckets; b++) {
+        if (buckets[b].empty()) continue;
+
+        long long base = 1LL * b * bucketSize * tamRegistro;
+        file.seekp(base, ios::beg);
+
+        long registrosEscritos = 0;
+        for (auto& r : buckets[b]) {
+            if (registrosEscritos >= bucketSize) {
+                // bucket cheio: encadeia no final do arquivo
+                file.seekp(0, ios::end);
+                long long newOffset = static_cast<long long>(file.tellp());
+                r.prox = -1;
+                file.write(reinterpret_cast<const char*>(&r), sizeof(Registro));
+
+                // atualizar encadeamento do anterior
+                if (registrosEscritos > 0) {
+                    long long prevOffset = newOffset - sizeof(Registro);
+                    Registro anterior{};
+                    file.seekg(prevOffset);
+                    file.read(reinterpret_cast<char*>(&anterior), sizeof(Registro));
+                    anterior.prox = (int32_t)newOffset;
+                    file.seekp(prevOffset);
+                    file.write(reinterpret_cast<const char*>(&anterior), sizeof(Registro));
+                }
+            } else {
+                file.write(reinterpret_cast<const char*>(&r), sizeof(Registro));
+                registrosEscritos++;
+            }
+        }
+    }
 
     file.close();
-    return true;
+    cout << "🧩 Inserido lote de " << regs.size() << " registros (escrita bucketizada).\n" << flush;
 }
 
-// ============================================================
-// INSERIR COM ENCADEAMENTO COMPLETO
-// ============================================================
-bool HashFile::inserir(const Registro& r) {
-    fstream file(path, ios::in | ios::out | ios::binary);
-    if (!file) {
-        cerr << "[ERRO] Falha ao abrir arquivo de dados para inserção." << endl;
-        return false;
-    }
+// Busca igual à versão anterior
+bool HashFile::buscar(int id, Registro& encontrado) {
+    resetarMetricas();
+    fstream file(filePath, ios::in | ios::binary);
+    if (!file.is_open()) return false;
 
-    insertCount++;
-    int bucket = hashFunction(r.id);
-    long offset = bucket * bucketSize * sizeof(Registro);
-    file.seekg(offset);
-
-    Registro temp;
-
-    // 1️⃣ tenta inserir dentro do bucket
-    for (int i = 0; i < bucketSize; i++) {
-        file.read(reinterpret_cast<char*>(&temp), sizeof(Registro));
-        if (temp.id == -1) {
-            file.seekp(offset + i * sizeof(Registro));
-            file.write(reinterpret_cast<const char*>(&r), sizeof(Registro));
-            file.flush();
-
-            if (insertCount % 100000 == 0)
-                cout << "[DEBUG] Inseridos: " << insertCount << " registros..." << endl;
-
-            file.close();
-            return true;
-        }
-    }
-
-    // 2️⃣ bucket cheio: encontrar o último da cadeia
-    long posUltimo = -1;
-    Registro atual;
-    for (int i = 0; i < bucketSize; i++) {
-        file.seekg(offset + i * sizeof(Registro));
-        file.read(reinterpret_cast<char*>(&atual), sizeof(Registro));
-
-        long prox = atual.prox;
-        long anterior = (offset + i * sizeof(Registro)) / sizeof(Registro);
-
-        while (prox != -1) {
-            file.seekg(prox * sizeof(Registro));
-            file.read(reinterpret_cast<char*>(&atual), sizeof(Registro));
-            anterior = prox;
-            prox = atual.prox;
-        }
-
-        if (atual.prox == -1) {
-            posUltimo = anterior;
-            break;
-        }
-    }
-
-    // 3️⃣ grava o novo registro no final do arquivo
-    file.seekp(0, ios::end);
-    long posNovo = file.tellp() / sizeof(Registro);
-    file.write(reinterpret_cast<const char*>(&r), sizeof(Registro));
-    file.flush();
-
-    // 4️⃣ atualiza ponteiro prox do último registro da cadeia
-    if (posUltimo != -1) {
-        file.seekg(posUltimo * sizeof(Registro));
-        file.read(reinterpret_cast<char*>(&temp), sizeof(Registro));
-        temp.prox = posNovo;
-        file.seekp(posUltimo * sizeof(Registro));
-        file.write(reinterpret_cast<const char*>(&temp), sizeof(Registro));
-        file.flush();
-    }
-
-    // if (insertCount % 10000 == 0)
-    //     cout << "[DEBUG] Bucket cheio! ID=" << r.id
-    //          << " gravado na posição encadeada=" << posNovo
-    //          << " (ligado após registro " << posUltimo << ")" << endl;
-
-    file.close();
-    return true;
-}
-
-// ============================================================
-// BUSCAR – percorre encadeamento completo
-// ============================================================
-bool HashFile::buscar(int id, Registro& resultado) {
-    fstream file(path, ios::in | ios::binary);
-    if (!file) return false;
-    blocosLidos = 0;
-
-    int bucket = hashFunction(id);
-    long offset = bucket * bucketSize * sizeof(Registro);
-
-    cout << "[DEBUG] Buscando ID=" << id
-         << " hash=" << bucket
-         << " offset=" << offset << endl;
-
-    Registro temp;
+    const long long base = 1LL * hashFunction(id) * bucketSize * regSize();
+    Registro temp{};
 
     for (int i = 0; i < bucketSize; i++) {
-        file.seekg(offset + i * sizeof(Registro));
+        file.seekg(base + i * regSize(), ios::beg);
         file.read(reinterpret_cast<char*>(&temp), sizeof(Registro));
+        if (!file) break;
         blocosLidos++;
 
         if (temp.id == id) {
-            resultado = temp;
+            encontrado = temp;
             file.close();
             return true;
         }
 
-        long proxAtual = temp.prox;
-        while (proxAtual != -1) {
-            file.seekg(proxAtual * sizeof(Registro));
+        int32_t prox = temp.prox;
+        while (prox != -1) {
+            file.seekg(prox, ios::beg);
             file.read(reinterpret_cast<char*>(&temp), sizeof(Registro));
+            if (!file) break;
             blocosLidos++;
-
             if (temp.id == id) {
-                resultado = temp;
+                encontrado = temp;
                 file.close();
                 return true;
             }
-
-            proxAtual = temp.prox;
+            prox = temp.prox;
         }
     }
 
@@ -159,6 +133,8 @@ bool HashFile::buscar(int id, Registro& resultado) {
     return false;
 }
 
-int HashFile::getBlocosLidos() const {
-    return blocosLidos;
+long HashFile::getTotalBlocos() const {
+    long long bytes = fileSizeBytes();
+    if (bytes <= 0) return 0;
+    return static_cast<long>(bytes / regSize());
 }
