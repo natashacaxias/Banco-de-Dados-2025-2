@@ -45,7 +45,6 @@ ptr escrever(fstream* file, no *novo){
     return pt;
 }
 
-// 
 void inserirCP(fstream *file, ptr atual, no *noAtual, key newKey, ptr newPointerE, bool ehFolha, ptr newPointerD=-1) {
 
     key *keys = noAtual->keys;
@@ -56,50 +55,46 @@ void inserirCP(fstream *file, ptr atual, no *noAtual, key newKey, ptr newPointer
     int i = tam-1;
     while(i>=0 && keys[i]>newKey) { // move as chaves
         keys[i+1] = keys[i];
+        pointers[i+2] = pointers[i+1];
         i--;
-    }
+    } i++;
     keys[i+1] = newKey; // insere nova chave
+    if (ehFolha){
+        pointers[i+1] = pointers[i+1];
+        pointers[i] = newPointerE;
+    }
+    else {
+        // o esquerdo continua apontando pro no original e o direito aponta para o novo
+        pointers[i] = newPointerE;
+        pointers[i+1] = newPointerD;
+    }
     (*qtdKeys)++;
-
-    if(ehFolha) { // move os ponteiros da folha
-        for(int j=tam-1;j>=i+1;j--) pointers[j+1] = pointers[j];
-        pointers[i+1] = newPointerE; // insere novo ponteiro
-    }
-    else { // move os ponteiros do nó interno
-        for(int j=tam;j>i+1;j--) pointers[j] = pointers[j-1];
-        pointers[i+1] = newPointerE;
-        pointers[i+2] = newPointerD;
-    }
 
     reescrever(file, atual, noAtual);
 }
 
-ptr cisao(fstream *file, ptr atual, no *noAtual, key chave, ptr ponteiro, bool ehFolha, ptr ponteiroD=-1){
-    no novoNo;
-    novoNo.folha = ehFolha;
-    novoNo.qtdKeys = 0;
-    
-    int tam = noAtual->qtdKeys;
-    int cis = (tam+1)/2;
+ptr cisao(fstream *file, ptr atual, no *noAtual, ptr novo, no *novoNo, key chave, ptr ponteiro, bool ehFolha, ptr ponteiroD=-1){
 
-    int pos = lower_bound(noAtual->keys, noAtual->keys+tam, chave) - noAtual->keys;
-    
-    if(ehFolha && pos < cis) cis--; // dá mais um pra nova folha pra ficar balanceado
+    inserirCP(file, atual, noAtual, chave, ponteiro, ehFolha, ponteiroD);
+
+    int tam = noAtual->qtdKeys;
+    int cis = ceil(tam/2.0);
 
     for(int i=cis;i<tam;i++){ // copia pro novo nó/folha
-        novoNo.keys[i-cis] = noAtual->keys[i];
-        novoNo.ponteiros[i-cis+1] = noAtual->ponteiros[i+1];
+        novoNo->keys[i-cis] = noAtual->keys[i];
+        novoNo->ponteiros[i-cis+1] = noAtual->ponteiros[i+1];
     }
+    noAtual->ponteiros[0] = novoNo->ponteiros[cis];
 
-    noAtual->ponteiros[0] = novoNo.ponteiros[cis]; // ptr pra próxima folha (se folha) ou ptr esquerdo (se nó interno)
-
-    novoNo.qtdKeys = tam - cis;
-    noAtual->qtdKeys = cis;
+    novoNo->qtdKeys = ceil(tam/2);
+    noAtual->qtdKeys = tam - ceil(tam/2);
     if(!ehFolha) noAtual->qtdKeys--; // se nó interno, "remove" chave promovida
+    
 
-    reescrever(file, atual, noAtual); // atualiza noAtual
-    ptr novo = escrever(file, &novoNo); // escreve novoNo no arquivo
     if(ehFolha) noAtual->ponteiros[noAtual->qtdKeys] = novo; // atualiza último ponteiro para a nova folha;
+    reescrever(file, atual, noAtual); // atualiza noAtual
+    reescrever(file, novo, novoNo); // atualiza noAtual
+
     return novo;
 }
 
@@ -178,7 +173,11 @@ struct bp{
         }
         else{ // não há espaço na folha
             // divide folha atual no meio, guarda ponteiro da nova folha e atualiza chave e ponteiro atuais
-            ponteiro = cisao(file, atual, &noAtual, chave, ponteiro, true);
+            no novoNo;
+            novoNo.folha = true;
+            novoNo.qtdKeys = 0;
+            ptr novo = escrever(file, &novoNo); // escreve novoNo no arquivo
+            ponteiro = cisao(file, atual, &noAtual, novo, &novoNo, chave, ponteiro, true);
             chave = noAtual.keys[noAtual.qtdKeys];
             ponteiroE = atual;
         }
@@ -194,7 +193,11 @@ struct bp{
             }
             else { // não há espaço no nó interno
                 // divide nó atual, guarda ponteiro do novo nó e atualiza chave e ponteiro atuais
-                ponteiro = cisao(file, atual, &noAtual, chave, ponteiroE, false, ponteiro);
+                no novoNo;
+                novoNo.folha = true;
+                novoNo.qtdKeys = 0;
+                ptr novo = escrever(file, &novoNo); // escreve novoNo no arquivo
+                ponteiro = cisao(file, atual, &noAtual, novo, &novoNo, chave, ponteiro, false, novo);
                 chave = noAtual.keys[noAtual.qtdKeys-1];
                 ponteiroE = atual;
             }
