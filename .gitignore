@@ -1,0 +1,4 @@
+# Ignorar datasets grandes
+/data/*
+*.csv
+*.csv.gz
