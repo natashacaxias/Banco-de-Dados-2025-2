@@ -1,0 +1,7 @@
+# arquivos temporários
+__pycache__/
+*.pyc
+
+# arquivos de sistema
+.DS_Store
+app/data/artigo.csv.gz
