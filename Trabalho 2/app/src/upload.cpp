@@ -1,6 +1,7 @@
 #include <bits/stdc++.h>
 #include <cstring>
 #include "../include/hashfile.h"
+#include "../include/bptreefile.h"
 using namespace std;
 
 const int BATCH_SIZE = 10000;

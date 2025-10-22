@@ -1,9 +1,9 @@
 import csv
 import re
 
-ARQUIVO_ENTRADA = "/data/artigo.csv"
-ARQUIVO_SAIDA = "/data/artigo_corrigido.csv"
-ARQUIVO_LOG = "/data/erros_csv.log"
+ARQUIVO_ENTRADA = "data/artigo_teste.csv"
+ARQUIVO_SAIDA = "data/artigo_corrigido.csv"
+ARQUIVO_LOG = "data/erros_csv.log"
 
 def corrigir_csv(entrada, saida, log, num_campos=7):
     with open(entrada, 'r', encoding='utf-8', errors='replace') as f_in, \
@@ -27,6 +27,7 @@ def corrigir_csv(entrada, saida, log, num_campos=7):
             texto = ";".join(linha)
             texto = re.sub(r'\s+', ' ', texto)  # remove quebras de linha dentro do campo
             partes = texto.split(';')
+            mx = max(mx, len(partes[1]))
 
             if len(partes) > num_campos:
                 partes = partes[:num_campos]
@@ -45,6 +46,7 @@ def corrigir_csv(entrada, saida, log, num_campos=7):
         print(f"⚠️ Linhas ainda problemáticas: {erros}")
         print(f"📁 Arquivo corrigido salvo em: {saida}")
         print(f"📜 Log de erros: {log}")
+        print(mx)
 
 if __name__ == "__main__":
     corrigir_csv(ARQUIVO_ENTRADA, ARQUIVO_SAIDA, ARQUIVO_LOG)
