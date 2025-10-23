@@ -1,13 +1,14 @@
 #ifndef BPTREE_H
 #define BPTREE_H
 
+#ifndef M
+#define M 4096 // Valor padrão caso não seja passado na compilação
+#endif
+
 #include <fstream>
 #include <stack>
 #include <algorithm>
-
 using namespace std;
-
-const int M = 4; // FAZER FUNÇÃO PRA OBTER BLOCO E CALCULAR M CORRETO!!
 using ptr = streampos;
 
 template<typename key>
