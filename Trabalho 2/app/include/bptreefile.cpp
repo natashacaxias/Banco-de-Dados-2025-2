@@ -117,15 +117,16 @@ pair<key,ptr> cisao(fstream *file, ptr pAtual, no<key> *noAtual, no<key> *noNovo
     noNovo->qtdKeys = tam - meio;
     noAtual->qtdKeys = meio; // mantém apenas metade inferior
 
+    ptr pNovo;
     if (noAtual->folha) {
         // Conecta folhas
         noNovo->ponteiros[M] = noAtual->ponteiros[M];
-        ptr pNovo = escrever(file, noNovo);
+        pNovo = escrever(file, noNovo);
         noAtual->ponteiros[M] = pNovo;
         reescrever(file, pAtual, noAtual);
     } else {
         noNovo->ponteiros[noNovo->qtdKeys] = noAtual->ponteiros[tam];
-        ptr pNovo = escrever(file, noNovo);
+        pNovo = escrever(file, noNovo);
         reescrever(file, pAtual, noAtual);
     }
 
@@ -136,12 +137,14 @@ pair<key,ptr> cisao(fstream *file, ptr pAtual, no<key> *noAtual, no<key> *noNovo
 
 // Desce na árvore buscando a folha correspondente à chave alvo
 template<typename key>
-ptr acharFolha(fstream *file, ptr pRaiz, key alvo, stack<ptr> *pilha = NULL){
+pair<ptr, int> acharFolha(fstream *file, ptr pRaiz, key alvo, stack<ptr> *pilha = NULL){
     ptr pAtual = pRaiz;
     no<key> noAtual;
+    int qtd_blocos = 0;
 
     while(true){ // Desce a árvore até encontrar uma folha
         carregar(file, pAtual, &noAtual);
+        qtd_blocos++;
 
         if(noAtual.folha) break;
 
@@ -153,7 +156,8 @@ ptr acharFolha(fstream *file, ptr pRaiz, key alvo, stack<ptr> *pilha = NULL){
         pAtual = noAtual.ponteiros[i]; // Ponteiro esquerdo da chave encontrada
     }
 
-    return pAtual;
+    // Retorna ponteiro para folha e quantidade de blocos lidos
+    return {pAtual, qtd_blocos};
 }
 
 // ======= Árvore B+ ===========================================
@@ -169,25 +173,31 @@ struct bp{
         this->file = f;
         no<key> raiz; raiz.folha = true; raiz.qtdKeys = 0;
         this->raiz = escrever(f, &raiz);
-        this->qtd_nos++;
+        this->qtd_nos += 1;
     }
 
-    ptr buscar(key alvo){
+    pair<ptr,int> buscar(key alvo){
+        int qtd_blocos = 0;
         no<key> folha;
-        ptr pFolha = acharFolha(file, this->raiz, alvo);
+        pair<ptr,int> res = acharFolha(file, this->raiz, alvo);
+        ptr pFolha = res.first; 
         carregar(file, pFolha, &folha);
+        qtd_blocos = res.second + 1;
 
         // Busca binária na folha (encontra igual ou primeiro maior)
         int i = lower_bound(folha.keys, folha.keys + folha.qtdKeys, alvo, comp<key>())-folha.keys;
+
+        // Retorna ponteiro e quantidade de blocos lidos
         if (i < folha.qtdKeys && KeyOps<key>::equal(folha.keys[i], alvo))
-            return folha.ponteiros[i];
+            return {folha.ponteiros[i], qtd_blocos};
         else // Se não for igual, alvo não existe
-            return -1;
+            return {-1,qtd_blocos};
     }
 
     void inserir(key chave, ptr ponteiro){
         stack<ptr> pilha; // Guarda caminho na árvore para casos de cisão
-        ptr pAtual = acharFolha(file, this->raiz, chave, &pilha);
+        pair<ptr,int> res = acharFolha(file, this->raiz, chave, &pilha);
+        ptr pAtual = res.first;
         no<key> noAtual;
 
         carregar(file, pAtual, &noAtual);
@@ -204,7 +214,7 @@ struct bp{
         no<key> novoNo; // folha
         novoNo.folha = true; novoNo.qtdKeys = 0;
         pair<key, ptr> promovida = cisao(file, pAtual, &noAtual, &novoNo, chave, ponteiro);
-        this->qtd_nos++;
+        this->qtd_nos += 1;
         chave = promovida.first; ponteiro = promovida.second;
 
         // "Sobe" na árvore até encontrar espaço (tira da pilha)
@@ -221,7 +231,7 @@ struct bp{
             // Se não, divide o nó interno em dois e promove a chave do meio
             novoNo.folha = false; novoNo.qtdKeys = 0;
             promovida = cisao(file, pAtual, &noAtual, &novoNo, chave, ponteiro);
-            this->qtd_nos++;
+            this->qtd_nos += 1;
             chave = promovida.first; ponteiro = promovida.second;
 
             // Se chegou na raíz, para
@@ -236,7 +246,7 @@ struct bp{
         novaRaiz.ponteiros[1] = ponteiro;
         novaRaiz.qtdKeys = 1;
         this->raiz = escrever(file, &novaRaiz);
-        this->qtd_nos++;
+        this->qtd_nos += 1;
     }
 
     void mostrarArvore(ptr noAtual, int nivel) {
