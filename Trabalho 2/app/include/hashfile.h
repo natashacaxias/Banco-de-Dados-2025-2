@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <array>
+#include "commom.h"
 using namespace std;
 
 // =====================
@@ -12,19 +14,8 @@ using namespace std;
 
 struct loteReturn{
     long long pos;
-    char titulo[300];
+    array<char,300> titulo;
     int id;
-};
-
-struct Registro {
-    int id;
-    char titulo[300];           // alinhado ao enunciado
-    char ano[8];
-    char autores[150];          // alinhado ao enunciado
-    char citacoes[16];
-    char data_atualizacao[32];
-    char snippet[1024];         // tamanho max (100–1024). Ajustei para 1024
-    int32_t prox;               // offset (em bytes) do próximo registro na cadeia; -1 se fim
 };
 
 struct RegistroCSV {

@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
     cout << "=== TP2 – Busca por id (findrec) ===" << endl;
 
     if (argc < 1) {
-        cerr << "Uso: ./bin/seek1 <chave>" << endl;
+        cerr << "Uso: ./bin/findrec.exe <chave>" << endl;
         return 1;
     }
 
@@ -42,7 +42,7 @@ int main(int argc, char* argv[]) {
     if (encontrado) {
         cout << "\nRegistro encontrado:\n";
         cout << "ID: " << r.id << "\n";
-        cout << "Titulo: " << r.titulo << "\n";
+        cout << "Titulo: " << r.titulo.data() << "\n";
         cout << "Ano: " << r.ano << "\n";
         cout << "Autores: " << r.autores << "\n";
         cout << "Citacoes: " << r.citacoes << "\n";

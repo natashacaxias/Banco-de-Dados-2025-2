@@ -1,19 +1,7 @@
 #include <bits/stdc++.h>
+#include"commom.h"
 using namespace std;
 using ptr = long long;
-
-struct Registro {
-    int id;
-    char titulo[300];           // alinhado ao enunciado
-    char ano[8];
-    char autores[150];          // alinhado ao enunciado
-    char citacoes[16];
-    char data_atualizacao[32];
-    char snippet[1024];         // tamanho max (100–1024)
-    int32_t prox;               
-};
-
-static inline long long regSize() { return static_cast<long long>(sizeof(Registro)); }
 
 // ===== Nó da árvore (pode ser folha ou nó interno) =====
 template<typename key, int M>
@@ -163,21 +151,44 @@ ptr escrever(fstream* file, no<key, M> *novo, PageCache<key,M>* cache = nullptr)
 
 // ===== Traits para tratar diferentes tipos de chave =====
 
-// Trait padrão para tipos triviais (int, double, etc.)
+// === KeyOps para tipos padrão (int, double, etc.) ===
 template<typename Key>
 struct KeyOps {
     static bool less(const Key& a, const Key& b) { return a < b; }
     static bool equal(const Key& a, const Key& b) { return a == b; }
     static void copy(Key& dest, const Key& src) { dest = src; }
+
+    // NOVO: Método para imprimir chave
+    static void print(const Key& k) { 
+        cout << k; 
+    }
 };
 
-// Especialização para arrays de char (strings)
+// === Especialização para array<char, N> ===
 template<size_t N>
-struct KeyOps<char[N]> {
-    static bool less(const char a[N], const char b[N]) { return strcmp(a, b) < 0; }
-    static bool equal(const char a[N], const char b[N]) { return strcmp(a, b) == 0; }
-    static void copy(char dest[N], const char src[N]) { strcpy(dest, src); }
+struct KeyOps<array<char, N>> {
+    static bool less(const array<char, N>& a, const array<char, N>& b){
+        return strcmp(a.data(), b.data()) < 0;
+    }
+    static bool equal(const array<char, N>& a, const array<char, N>& b){
+        return strcmp(a.data(), b.data()) == 0;
+    }
+    static void copy(array<char, N>& dest, const array<char, N>& src) {
+        // CORREÇÃO: Zera o destino antes de copiar
+        memset(dest.data(), 0, N);
+        strncpy(dest.data(), src.data(), N-1);
+        dest[N-1] = '\0'; // Garante terminação
+    }
+
+    static void print(const array<char, N>& k) {
+        cout << k.data(); // Mais simples
+    }
 };
+
+template<typename Key>
+void printKey(const Key& k) {
+    KeyOps<Key>::print(k);
+}
 
 // Comparador dos traits para busca binária
 template<typename key>
@@ -185,44 +196,44 @@ auto comp() {
     return [](const key& a, const key& b) { return KeyOps<key>::less(a,b); };
 }
 
-// ===== Nó da árvore (pode ser folha ou nó interno) =====
-// template<typename key, int M>
-// struct no{
-//     // Espaços mais para fazer inserções temporárias em caso de cisão
-//     ptr ponteiros[M+2];
-//     key keys[M+1];
-//     int qtdKeys;
-//     bool folha;
-// };
-
-
 // Insere par chave/ponteiro em um nó
 template<typename key, int M>
 void inserirCP(fstream *file, no<key, M> *noAtual, key chave, ptr ponteiro, ptr pAtual, PageCache<key,M>* cache){
     key *chaves = noAtual->keys;
     ptr *ponteiros = noAtual->ponteiros;
 
-    int i = noAtual->qtdKeys-1;
-
-    // Desloca as chaves e ponteiros até encontrar o local certo para a novva chave
-    while(i>=0 && KeyOps<key>::less(chave, chaves[i])){
-        KeyOps<key>::copy(chaves[i+1], chaves[i]);
-        ponteiros[i+1] = ponteiros[i];
-        i--;
-    }
-    i++;
-    KeyOps<key>::copy(chaves[i+1], chave);
+    int i = noAtual->qtdKeys - 1;
 
     if(noAtual->folha){
-        // Se for folha, chaves e ponteiros em índices iguais andam juntos
-        ponteiros[i+1] = ponteiros[i];
-        ponteiros[i] = ponteiro;
+        // Desloca chaves e ponteiros para abrir espaço para a nova chave
+        while(i >= 0 && KeyOps<key>::less(chave, chaves[i])){
+            //KeyOps<key>::copy(chaves[i+1], chaves[i]);
+            memmove(&chaves[i+1], &chaves[i], sizeof(key));
+
+            ponteiros[i+1] = ponteiros[i];
+            i--;
+        }
+        i++; // posição correta para inserir
+
+        //KeyOps<key>::copy(chaves[i], chave);
+        memcpy(&chaves[i], &chave, sizeof(key));
+        ponteiros[i] = ponteiro; // ponteiro do registro no arquivo de dados
     }
-    else{
-        // Se for nó interno, o novo ponteiro corresponde ao novo nó à direita após cisão
-        ponteiros[i+1] = ponteiro;
+    else {
+        // Para nós internos, encontra posição para nova chave
+        while(i >= 0 && KeyOps<key>::less(chave, chaves[i])){
+            //KeyOps<key>::copy(chaves[i+1], chaves[i]);
+            memmove(&chaves[i+1], &chaves[i], sizeof(key));
+            memmove(&ponteiros[i+2], &ponteiros[i+1], sizeof(ptr)*(1)); 
+            //ponteiros[i+2] = ponteiros[i+1]; // desloca ponteiros à direita
+            i--;
+        }
+        i++; // posição para inserir a chave
+        //KeyOps<key>::copy(chaves[i], chave);
+        memcpy(&chaves[i], &chave, sizeof(key));
+        ponteiros[i+1] = ponteiro; // ponteiro para o novo nó à direita
     }
-    
+
     noAtual->qtdKeys++;
     reescrever(file, pAtual, noAtual, cache);
 }
@@ -265,7 +276,7 @@ pair<key,ptr> cisao(fstream *file, ptr pAtual, no<key, M> *noAtual, no<key, M> *
 
 // Desce na árvore buscando a folha correspondente à chave alvo
 template<typename key, int M>
-pair<ptr, int> acharFolha(fstream *file, ptr pRaiz, key alvo, stack<ptr> *pilha = NULL, PageCache<key,M>* cache = nullptr){
+pair<ptr, int> acharFolha(fstream *file, ptr pRaiz, key& alvo, stack<ptr> *pilha = NULL, PageCache<key,M>* cache = nullptr){
     ptr pAtual = pRaiz;
     no<key, M> noAtual;
     int qtd_blocos = 0;
@@ -283,8 +294,8 @@ pair<ptr, int> acharFolha(fstream *file, ptr pRaiz, key alvo, stack<ptr> *pilha 
 
         pAtual = noAtual.ponteiros[i]; // Ponteiro esquerdo da chave encontrada
     }
-
     // Retorna ponteiro para folha e quantidade de blocos lidos
+
     return {pAtual, qtd_blocos};
 }
 
@@ -316,28 +327,13 @@ struct bp{
         this->file = f;
         this->cache = make_unique<PageCache<key,M>>(f);
         this->cache->setFile(f);
-
-        f->seekg(0, ios::beg);
-        ptr st = file->tellp();
-        this->raiz = st;
+        this->raiz = 0;
     }
 
     // Força flush do cache para disco
     void flushCache() {
         if (cache) cache->flush();
     }
-
-    // long long fileSizeBytes() const {
-    //     fstream file(file, ios::binary | ios::ate);
-    //     if (!file.is_open()) return 0;
-    //     return static_cast<long long>(file.tellg());
-    // }
-
-    // long getTotalBlocos() const {
-    //     long long bytes = fileSizeBytes();
-    //     if (bytes <= 0) return 0;
-    //     return static_cast<long>(bytes / regSize());
-    // }
 
     pair<bool, long> buscar(key alvo, Registro& encontrado, fstream* db){
         int qtd_blocos = 0;
@@ -346,7 +342,7 @@ struct bp{
         
         ptr pFolha = res.first; 
         carregar(file, pFolha, &folha, cache.get());
-        qtd_blocos = res.second + 1;
+        qtd_blocos = res.second + 1;        
 
         // Busca binária na folha (encontra igual ou primeiro maior)
         int i = lower_bound(folha.keys, folha.keys + folha.qtdKeys, alvo, comp<key>())-folha.keys;
@@ -360,7 +356,8 @@ struct bp{
             encontrado = temp;
             res2.first = true;
         }
-        else res2.second = false;
+        else res2.first = false;
+        res2.second = qtd_blocos;
         return res2;
     }
 
@@ -426,78 +423,12 @@ struct bp{
         this->qtd_nos += 1;
     }
 
-    void mostrarArvore(ptr noAtual, int nivel) {
-        if (noAtual == -1) return;
-        
-        no<key, M> no;
-        carregar(file, noAtual, &no, cache.get());
-
-        cout << "Quantidade de nós: " << this->qtd_nos << "\n";
-        
-        // Imprime indentação conforme o nível
-        for (int i=0; i<nivel; i++) cout << "  ";
-        
-        // Imprime o nó
-        cout << "No " << noAtual << " (nivel " << nivel << ", " 
-            << (no.folha ? "folha" : "interno") << "): ";
-        
-        for (int i=0;i<no.qtdKeys;i++) {
-            cout << no.keys[i];
-            if (i < no.qtdKeys - 1) cout << ", ";
-        }
-        cout << endl;
-        
-        // Se não é folha, mostra os filhos recursivamente
-        if (!no.folha) {
-            for (int i=0;i<=no.qtdKeys;i++) {
-                mostrarArvore(no.ponteiros[i], nivel + 1);
-            }
-        }
-    }
-
     // Destrutor para garantir que o cache seja flushado ao final
     ~bp() {
         if (cache) cache->flush();
     }
 };
 
-// No final de bptreefile.cpp, substitua as instanciações por:
-
-// Instanciações para int
+template struct bp<array<char,300>, 64>;
 template struct bp<int, 64>;
-template void inserirCP<int, 64>(fstream*, no<int, 64>*, int, ptr, ptr, PageCache<int, 64>*);
-template pair<int, ptr> cisao<int, 64>(fstream*, ptr, no<int, 64>*, no<int, 64>*, int, ptr, PageCache<int, 64>*);
-template pair<ptr, int> acharFolha<int, 64>(fstream*, ptr, int, stack<ptr>*, PageCache<int, 64>*);
 
-// Especializações explícitas para char[300] - precisamos usar wrappers
-using Char300 = char[300];
-
-// Wrapper para char[300] que pode ser usado em std::pair
-struct Char300Wrapper {
-    char data[300];
-    
-    Char300Wrapper() { data[0] = '\0'; }
-    Char300Wrapper(const char* src) { 
-        strncpy(data, src, 299);
-        data[299] = '\0';
-    }
-    
-    bool operator<(const Char300Wrapper& other) const {
-        return strcmp(data, other.data) < 0;
-    }
-    
-    bool operator==(const Char300Wrapper& other) const {
-        return strcmp(data, other.data) == 0;
-    }
-};
-
-ostream& operator<<(std::ostream& os, const Char300Wrapper& wrapper) {
-    os << wrapper.data;
-    return os;
-}
-
-// Instanciações usando o wrapper
-template struct bp<Char300Wrapper, 64>;
-template void inserirCP<Char300Wrapper, 64>(fstream*, no<Char300Wrapper, 64>*, Char300Wrapper, ptr, ptr, PageCache<Char300Wrapper, 64>*);
-template pair<Char300Wrapper, ptr> cisao<Char300Wrapper, 64>(fstream*, ptr, no<Char300Wrapper, 64>*, no<Char300Wrapper, 64>*, Char300Wrapper, ptr, PageCache<Char300Wrapper, 64>*);
-template pair<ptr, int> acharFolha<Char300Wrapper, 64>(fstream*, ptr, Char300Wrapper, stack<ptr>*, PageCache<Char300Wrapper, 64>*);

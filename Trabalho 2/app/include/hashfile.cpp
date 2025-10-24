@@ -2,9 +2,8 @@
 #include <bits/stdc++.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include "commom.h"
 using namespace std;
-
-static inline long long regSize() { return static_cast<long long>(sizeof(Registro)); }
 
 HashFile::HashFile(string path, int nb, int bs)
     : filePath(std::move(path)), numBuckets(nb), bucketSize(bs) {}
@@ -94,7 +93,8 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
             // registra (id, posição) para o índice B+
             loteReturn novo;
             novo.id = r.id;
-            strcmp(novo.titulo, r.titulo);
+            strncpy(novo.titulo.data(), r.titulo.data(), sizeof(novo.titulo) - 1);
+            novo.titulo.data()[sizeof(novo.titulo) - 1] = '\0';
             novo.pos = pos;
             indices.push_back(novo);
         }

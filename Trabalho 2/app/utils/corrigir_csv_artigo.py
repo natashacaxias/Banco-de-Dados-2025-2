@@ -1,9 +1,9 @@
 import csv
 import re
 
-ARQUIVO_ENTRADA = "artigo_teste.csv"
-ARQUIVO_SAIDA = "artigo_corrigido.csv"
-ARQUIVO_LOG = "erros_csv.log"
+ARQUIVO_ENTRADA = "../data/artigo_teste.csv"
+ARQUIVO_SAIDA = "../data/artigo_corrigido.csv"
+ARQUIVO_LOG = "../data/erros_csv.log"
 
 def corrigir_csv(entrada, saida, log, num_campos=7):
     with open(entrada, 'r', encoding='utf-8', errors='replace') as f_in, \

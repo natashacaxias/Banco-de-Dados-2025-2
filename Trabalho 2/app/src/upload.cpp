@@ -11,7 +11,7 @@ const int PROGRESS_STEP = 50000;
 Registro toRegistro(const RegistroCSV& csv) {
     Registro r{};
     r.id = csv.id;
-    strncpy(r.titulo, csv.titulo.c_str(), sizeof(r.titulo) - 1);
+    strncpy(r.titulo.data(), csv.titulo.c_str(), sizeof(r.titulo) - 1);
     strncpy(r.ano, csv.ano.c_str(), sizeof(r.ano) - 1);
     strncpy(r.autores, csv.autores.c_str(), sizeof(r.autores) - 1);
     strncpy(r.citacoes, csv.citacoes.c_str(), sizeof(r.citacoes) - 1);
@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
 
     // ======== NOVO: Criação do arquivo de índice B+ ========
     using idKey = int;
-    using tituloKey = Char300Wrapper; 
+    using tituloKey = array<char,300>; 
     const int MId = 64;  // grau da árvore (ajuste conforme seu cálculo de bloco)
     const int MTitulo = 64;
     fstream bptFileId("./data/bptreeId.idx", ios::in | ios::out | ios::binary | ios::trunc);
@@ -129,13 +129,14 @@ int main(int argc, char* argv[]) {
             // grava no arquivo hash
             vector<loteReturn> indices = hashFile.inserirEmLote(buffer);
 
-            // ======== NOVO: inserir IDs e ponteiros na B+ tree ========
+            // Inserir IDs e ponteiros na B+ tree
             for (loteReturn lr : indices) {
                 bptreeId.inserir(lr.id, lr.pos);
-                Char300Wrapper tituloWrapper(lr.titulo);
-                bptreeTitulo.inserir(tituloWrapper, lr.pos);
+                array<char,300> tituloArray{};
+                memset(tituloArray.data(), 0, 300);
+                strncpy(tituloArray.data(), lr.titulo.data(), 299); 
+                bptreeTitulo.inserir(tituloArray, lr.pos);
             }
-            // ==========================================================
 
             buffer.clear();
         }
@@ -157,15 +158,17 @@ int main(int argc, char* argv[]) {
         vector<loteReturn> indices = hashFile.inserirEmLote(buffer);
         for (loteReturn lr : indices) {
             bptreeId.inserir(lr.id, lr.pos);
-            Char300Wrapper tituloWrapper(lr.titulo);
-            bptreeTitulo.inserir(tituloWrapper, lr.pos);
+            array<char,300> tituloArray{};
+            memset(tituloArray.data(), 0, 300);            
+            strncpy(tituloArray.data(), lr.titulo.data(), 299); 
+            bptreeTitulo.inserir(tituloArray, lr.pos);
         }
     }
 
     // Força escrita de tudo no disco
-    bptreeId.flushCache();
-    bptFileId.flush();
-    bptFileId.close();
+    bptreeId.flushCache(); bptreeTitulo.flushCache();
+    bptFileId.flush(); bptFileId.flush();
+    bptFileId.close(); bptFileTitulo.close();
 
     auto end = chrono::high_resolution_clock::now();
     double totalTime = chrono::duration<double>(end - start).count();

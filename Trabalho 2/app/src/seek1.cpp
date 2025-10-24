@@ -8,7 +8,7 @@ using namespace std;
 int main(int argc, char* argv[]) {
     cout << "=== TP2 - Busca por id (seek1) ===" << endl;
 
-    if (argc < 1) {
+    if (argc < 2) {
         cerr << "Uso: ./bin/seek1 <chave>" << endl;
         return 1;
     }
@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
     if (res.first) {
         cout << "\nRegistro encontrado:\n";
         cout << "ID: " << r.id << "\n";
-        cout << "Titulo: " << r.titulo << "\n";
+        cout << "Titulo: " << r.titulo.data() << "\n";
         cout << "Ano: " << r.ano << "\n";
         cout << "Autores: " << r.autores << "\n";
         cout << "Citacoes: " << r.citacoes << "\n";

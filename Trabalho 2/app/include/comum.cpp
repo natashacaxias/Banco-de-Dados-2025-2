@@ -1,1 +1,0 @@
-// colocar tudo que é igual pro hash e b+

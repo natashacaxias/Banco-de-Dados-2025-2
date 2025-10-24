@@ -1,52 +1,10 @@
-#ifndef BPTREE_H
-#define BPTREE_H
+#ifndef BPTREEFILE_H
+#define BPTREEFILE_H
 
-#include <fstream>
-#include <stack>
-#include <algorithm>
-#include <iostream>
-#include <memory>
-#include <list>
-#include <unordered_map>
-#include <cstring>
+#include <bits/stdc++.h>
+#include"commom.h"
 using namespace std;
 using ptr = long long;
-
-struct Registro {
-    int id;
-    char titulo[300];           // alinhado ao enunciado
-    char ano[8];
-    char autores[150];          // alinhado ao enunciado
-    char citacoes[16];
-    char data_atualizacao[32];
-    char snippet[1024];         // tamanho max (100–1024). Ajustei para 1024
-    int32_t prox;               // offset (em bytes) do próximo registro na cadeia; -1 se fim
-};
-
-// ===== Wrapper para char[300] =====
-struct Char300Wrapper {
-    char data[300];
-    
-    Char300Wrapper() { data[0] = '\0'; }
-    Char300Wrapper(const char* src) { 
-        strncpy(data, src, 299);
-        data[299] = '\0';
-    }
-    
-    bool operator<(const Char300Wrapper& other) const {
-        return strcmp(data, other.data) < 0;
-    }
-    
-    bool operator==(const Char300Wrapper& other) const {
-        return strcmp(data, other.data) == 0;
-    }
-};
-
-// Sobrecarga do operador << para output
-inline std::ostream& operator<<(std::ostream& os, const Char300Wrapper& wrapper) {
-    os << wrapper.data;
-    return os;
-}
 
 // ===== Nó da árvore (pode ser folha ou nó interno) =====
 template<typename key, int M>
@@ -58,12 +16,9 @@ struct no{
     bool folha;
 };
 
-// Forward declarations
+// ===== Cache de páginas (LRU) para reduzir I/O =====
+// Parâmetro CACHE_SIZE ajustável; default razoável (64 páginas)
 template<typename key, int M, size_t CACHE_SIZE = 64>
-class PageCache;
-
-// ===== Cache de páginas =====
-template<typename key, int M, size_t CACHE_SIZE>
 class PageCache {
 public:
     struct CacheEntry {
@@ -73,13 +28,14 @@ public:
     };
 
 private:
+    // Lista dupla encadeada para LRU: front = MRU, back = LRU
     list<pair<ptr, CacheEntry>> lruList;
     unordered_map<ptr, typename list<pair<ptr, CacheEntry>>::iterator> table;
     fstream* file;
 
 public:
-    PageCache(fstream* f = nullptr) : file(f) {}
-    void setFile(fstream* f) { file = f; }
+    PageCache(fstream* f = nullptr);
+    void setFile(fstream* f);
     bool contains(ptr address);
     no<key, M>* get(ptr address);
     void put(ptr address, const no<key, M>& node, bool dirty = false);
@@ -88,29 +44,76 @@ public:
     void clearAndFlush();
 };
 
+// ===== Utilitários otimizados com suporte a cache =====
 template<typename key, int M>
-struct bp {
+void carregar(fstream* file, ptr pag, no<key, M> *noo, PageCache<key,M>* cache = nullptr);
+
+template<typename key, int M>
+void reescrever(fstream* file, ptr pag, no<key, M> *novo, PageCache<key,M>* cache = nullptr);
+
+template<typename key, int M>
+ptr escrever(fstream* file, no<key, M> *novo, PageCache<key,M>* cache = nullptr);
+
+// ===== Traits para tratar diferentes tipos de chave =====
+template<typename Key>
+struct KeyOps {
+    static bool less(const Key& a, const Key& b);
+    static bool equal(const Key& a, const Key& b);
+    static void copy(Key& dest, const Key& src);
+};
+
+template<typename key>
+auto comp();
+
+template<size_t N>
+struct KeyOps<array<char, N>> {
+    static bool less(const array<char, N>& a, const array<char, N>& b){
+        return strcmp(a.data(), b.data()) < 0;
+    }
+    static bool equal(const array<char, N>& a, const array<char, N>& b){
+        return strcmp(a.data(), b.data()) == 0;
+    }
+    static void copy(array<char, N>& dest, const array<char, N>& src) {
+        // CORREÇÃO: Zera o destino antes de copiar
+        memset(dest.data(), 0, N);
+        strncpy(dest.data(), src.data(), N-1);
+        dest[N-1] = '\0'; // Garante terminação
+    }
+
+    static void print(const array<char, N>& k) {
+        cout << k.data(); // Mais simples
+    }
+};
+
+// Insere par chave/ponteiro em um nó
+template<typename key, int M>
+void inserirCP(fstream *file, no<key, M> *noAtual, key& chave, ptr ponteiro, ptr pAtual, PageCache<key,M>* cache);
+
+// Divide nó cheio em dois e promove uma chave
+template<typename key, int M>
+pair<key,ptr> cisao(fstream *file, ptr pAtual, no<key, M> *noAtual, no<key, M> *noNovo, key chave, ptr ponteiro, PageCache<key,M>* cache);
+
+// Desce na árvore buscando a folha correspondente à chave alvo
+template<typename key, int M>
+pair<ptr, int> acharFolha(fstream *file, ptr pRaiz, key& alvo, stack<ptr> *pilha = NULL, PageCache<key,M>* cache = nullptr);
+
+// ===== Árvore B+ =====
+template<typename key, int M>
+struct bp{
     ptr raiz;
     ptr primeiraFolha;
     ptr qtd_nos = 0;
     fstream* file;
-    unique_ptr<PageCache<key, M, 64>> cache;
+    unique_ptr<PageCache<key,M>> cache;
 
+    // Inicializa a árvore e o cache
     void iniciar(fstream* f);
     void carregarArvore(fstream* f);
     void flushCache();
-    //long getTotalBlocos();
     pair<bool, long> buscar(key alvo, Registro& encontrado, fstream* db);
     void inserir(key chave, ptr ponteiro);
-    void mostrarArvore(ptr noAtual, int nivel);
+    // void mostrarArvore(ptr noAtual, int nivel);
     ~bp();
 };
 
-// Declarações das funções utilitárias
-template<typename key, int M>
-void carregar(fstream* file, ptr pag, no<key, M>* noo, PageCache<key, M, 64>* cache = nullptr);
-
-// Declarações explícitas para os tipos que serão usados
-extern template struct bp<Char300Wrapper, 64>;
-
-#endif // BPTREE_H
+#endif // BPTREEFILE_H
