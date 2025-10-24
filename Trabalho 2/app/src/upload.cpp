@@ -4,9 +4,6 @@
 #include "../include/bptreefile.h"  // inclui o índice B+
 using namespace std;
 
-// g++ -std=c++17 -O2 -o bin/upload src/upload.cpp include/hashfile.cpp include/bptreefile.cpp
-//./bin/upload  "data\artigo_corrigido.csv"
-
 const int BATCH_SIZE = 10000;
 const int PROGRESS_STEP = 50000;
 

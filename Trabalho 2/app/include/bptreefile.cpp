@@ -2,6 +2,19 @@
 using namespace std;
 using ptr = long long;
 
+struct Registro {
+    int id;
+    char titulo[300];           // alinhado ao enunciado
+    char ano[8];
+    char autores[150];          // alinhado ao enunciado
+    char citacoes[16];
+    char data_atualizacao[32];
+    char snippet[1024];         // tamanho max (100–1024)
+    int32_t prox;               
+};
+
+static inline long long regSize() { return static_cast<long long>(sizeof(Registro)); }
+
 // ===== Nó da árvore (pode ser folha ou nó interno) =====
 template<typename key, int M>
 struct no{
@@ -314,23 +327,41 @@ struct bp{
         if (cache) cache->flush();
     }
 
-    pair<ptr,int> buscar(key alvo){
+    // long long fileSizeBytes() const {
+    //     fstream file(file, ios::binary | ios::ate);
+    //     if (!file.is_open()) return 0;
+    //     return static_cast<long long>(file.tellg());
+    // }
+
+    // long getTotalBlocos() const {
+    //     long long bytes = fileSizeBytes();
+    //     if (bytes <= 0) return 0;
+    //     return static_cast<long>(bytes / regSize());
+    // }
+
+    pair<bool, long> buscar(key alvo, Registro& encontrado, fstream* db){
         int qtd_blocos = 0;
         no<key, M> folha;
         pair<ptr,int> res = acharFolha(file, this->raiz, alvo, nullptr, cache.get());
-        //cout << "hey" << endl;
+        
         ptr pFolha = res.first; 
         carregar(file, pFolha, &folha, cache.get());
         qtd_blocos = res.second + 1;
 
         // Busca binária na folha (encontra igual ou primeiro maior)
         int i = lower_bound(folha.keys, folha.keys + folha.qtdKeys, alvo, comp<key>())-folha.keys;
+        Registro temp{};
 
-        // Retorna ponteiro e quantidade de blocos lidos
-        if (i < folha.qtdKeys && KeyOps<key>::equal(folha.keys[i], alvo))
-            return {folha.ponteiros[i], qtd_blocos};
-        else // Se não for igual, alvo não existe
-            return {-1,qtd_blocos};
+        pair<bool, long> res2;
+        res2.second = qtd_blocos;
+        if (i < folha.qtdKeys && KeyOps<key>::equal(folha.keys[i], alvo)){
+            (*db).seekg(folha.ponteiros[i], ios::beg);
+            (*db).read(reinterpret_cast<char*>(&temp), sizeof(Registro));
+            encontrado = temp;
+            res2.first = true;
+        }
+        else res2.second = false;
+        return res2;
     }
 
     void inserir(key chave, ptr ponteiro){

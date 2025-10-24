@@ -53,7 +53,7 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
 
     fstream file(filePath, ios::in | ios::out | ios::binary);
     if (!file.is_open()) {
-        cerr << "❌ Erro ao abrir arquivo de dados: " << filePath << endl;
+        cerr << "Erro ao abrir arquivo de dados: " << filePath << endl;
         return indices;
     }
 

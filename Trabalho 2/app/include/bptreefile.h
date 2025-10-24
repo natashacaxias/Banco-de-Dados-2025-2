@@ -12,6 +12,17 @@
 using namespace std;
 using ptr = long long;
 
+struct Registro {
+    int id;
+    char titulo[300];           // alinhado ao enunciado
+    char ano[8];
+    char autores[150];          // alinhado ao enunciado
+    char citacoes[16];
+    char data_atualizacao[32];
+    char snippet[1024];         // tamanho max (100–1024). Ajustei para 1024
+    int32_t prox;               // offset (em bytes) do próximo registro na cadeia; -1 se fim
+};
+
 // ===== Wrapper para char[300] =====
 struct Char300Wrapper {
     char data[300];
@@ -88,7 +99,8 @@ struct bp {
     void iniciar(fstream* f);
     void carregarArvore(fstream* f);
     void flushCache();
-    pair<ptr, int> buscar(key alvo);
+    //long getTotalBlocos();
+    pair<bool, long> buscar(key alvo, Registro& encontrado, fstream* db);
     void inserir(key chave, ptr ponteiro);
     void mostrarArvore(ptr noAtual, int nivel);
     ~bp();
