@@ -1,8 +1,11 @@
 #include <bits/stdc++.h>
 #include <cstring>
 #include "../include/hashfile.h"
-#include "../include/bptreefile.h"
+#include "../include/bptreefile.h"  // inclui o índice B+
 using namespace std;
+
+// g++ -std=c++17 -O2 -o bin/upload src/upload.cpp include/hashfile.cpp include/bptreefile.cpp
+//./bin/upload  "data\artigo_corrigido.csv"
 
 const int BATCH_SIZE = 10000;
 const int PROGRESS_STEP = 50000;
@@ -55,7 +58,7 @@ RegistroCSV parseCSV(const string &linha) {
 int main(int argc, char* argv[]) {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
-    cout.setf(std::ios::unitbuf); // força flush automático
+    cout.setf(std::ios::unitbuf);
 
     if (argc < 2) {
         cerr << "Uso: ./bin/upload <arquivo.csv>\n";
@@ -65,17 +68,39 @@ int main(int argc, char* argv[]) {
     string caminhoCSV = argv[1];
     ifstream arquivo(caminhoCSV);
     if (!arquivo.is_open()) {
-        cerr << "❌ Erro ao abrir arquivo CSV: " << caminhoCSV << endl;
+        cerr << "Erro ao abrir arquivo CSV: " << caminhoCSV << endl;
         return 1;
     }
 
-    cout << "🚀 Iniciando upload interativo do arquivo: " << caminhoCSV << "\n";
+    cout << "Iniciando upload interativo do arquivo: " << caminhoCSV << "\n";
     cout << "--------------------------------------------------------\n";
 
     const int NUM_BUCKETS = 97;
     const int BUCKET_SIZE = 4096;
     HashFile hashFile("./data/data.db", NUM_BUCKETS, BUCKET_SIZE);
     hashFile.criarArquivoVazio();
+
+    // ======== NOVO: Criação do arquivo de índice B+ ========
+    using idKey = int;
+    using tituloKey = Char300Wrapper; 
+    const int MId = 64;  // grau da árvore (ajuste conforme seu cálculo de bloco)
+    const int MTitulo = 64;
+    fstream bptFileId("./data/bptreeId.idx", ios::in | ios::out | ios::binary | ios::trunc);
+    if (!bptFileId.is_open()) {
+        cerr << "Erro ao criar arquivo de índice B+: ./data/bptreeId.idx\n";
+        return 1;
+    }
+    fstream bptFileTitulo("./data/bptreeTitulo.idx", ios::in | ios::out | ios::binary | ios::trunc);
+    if (!bptFileTitulo.is_open()) {
+        cerr << "Erro ao criar arquivo de índice B+: ./data/bptreeId.idx\n";
+        return 1;
+    }
+
+    bp<idKey, MId> bptreeId;
+    bp<tituloKey, MTitulo> bptreeTitulo;
+    bptreeId.iniciar(&bptFileId);
+    bptreeTitulo.iniciar(&bptFileTitulo);
+    // =======================================================
 
     vector<Registro> buffer;
     buffer.reserve(BATCH_SIZE);
@@ -86,12 +111,12 @@ int main(int argc, char* argv[]) {
         totalLinhas = count(istreambuf_iterator<char>(temp),
                             istreambuf_iterator<char>(), '\n');
     }
-    cout << "📊 Total de linhas detectadas: " << totalLinhas << "\n\n";
+    cout << "Total de linhas detectadas: " << totalLinhas << "\n\n";
 
     auto start = chrono::high_resolution_clock::now();
     string linha;
 
-    cout << "📦 Iniciando leitura e inserção..." << endl;
+    cout << "Iniciando leitura e inserção..." << endl;
 
     while (getline(arquivo, linha)) {
         if (linha.empty()) continue;
@@ -102,8 +127,19 @@ int main(int argc, char* argv[]) {
         buffer.push_back(toRegistro(csv));
         inseridos++;
 
+        // Processa em lotes para eficiência
         if (buffer.size() >= BATCH_SIZE) {
-            hashFile.inserirEmLote(buffer);
+            // grava no arquivo hash
+            vector<loteReturn> indices = hashFile.inserirEmLote(buffer);
+
+            // ======== NOVO: inserir IDs e ponteiros na B+ tree ========
+            for (loteReturn lr : indices) {
+                bptreeId.inserir(lr.id, lr.pos);
+                Char300Wrapper tituloWrapper(lr.titulo);
+                bptreeTitulo.inserir(tituloWrapper, lr.pos);
+            }
+            // ==========================================================
+
             buffer.clear();
         }
 
@@ -113,31 +149,43 @@ int main(int argc, char* argv[]) {
             double percent = (100.0 * inseridos) / totalLinhas;
             double speed = inseridos / elapsed;
             cout << fixed << setprecision(1);
-            cout << "⏱️ " << setw(7) << elapsed << "s | "
+            cout << "⏱" << setw(7) << elapsed << "s | "
                  << setw(8) << inseridos << "/" << totalLinhas
                  << " (" << percent << "%) — "
                  << (int)speed << " regs/s\n" << flush;
         }
     }
 
-    if (!buffer.empty())
-        hashFile.inserirEmLote(buffer);
+    if (!buffer.empty()) {
+        vector<loteReturn> indices = hashFile.inserirEmLote(buffer);
+        for (loteReturn lr : indices) {
+            bptreeId.inserir(lr.id, lr.pos);
+            Char300Wrapper tituloWrapper(lr.titulo);
+            bptreeTitulo.inserir(tituloWrapper, lr.pos);
+        }
+    }
+
+    // Força escrita de tudo no disco
+    bptreeId.flushCache();
+    bptFileId.flush();
+    bptFileId.close();
 
     auto end = chrono::high_resolution_clock::now();
     double totalTime = chrono::duration<double>(end - start).count();
 
-    cout << "\n✅ Upload concluído!\n";
-    cout << "📈 Registros válidos: " << inseridos
-         << " | ⚠️ Inválidos: " << invalidos << "\n";
-    cout << "⏱️ Tempo total: " << fixed << setprecision(2)
+    cout << "\nUpload concluido!\n";
+    cout << "Registros validos: " << inseridos
+         << " | Invalidos: " << invalidos << "\n";
+    cout << "Tempo total: " << fixed << setprecision(2)
          << totalTime << " s\n";
     if (totalTime > 0)
-        cout << "🚀 Velocidade média: " << (int)(inseridos / totalTime)
+        cout << "Velocidade media: " << (int)(inseridos / totalTime)
              << " regs/s\n";
 
-    cout << "💾 Total de blocos no arquivo: "
+    cout << "Total de blocos no arquivo: "
          << hashFile.getTotalBlocos() << endl;
 
+    cout << "Indices B+ salvos em: ./data/bptreeId.idx e ./data/bptreeTitulo.idx\n";
     cout << "--------------------------------------------------------\n";
-    cout << "Arquivo salvo em: /data/data.db\n";
+    cout << "Arquivo principal salvo em: ./data/data.db\n";
 }

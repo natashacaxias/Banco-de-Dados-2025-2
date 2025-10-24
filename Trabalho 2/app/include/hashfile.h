@@ -9,6 +9,13 @@ using namespace std;
 // =====================
 // Estruturas
 // =====================
+
+struct loteReturn{
+    long long pos;
+    char titulo[300];
+    int id;
+};
+
 struct Registro {
     int id;
     char titulo[300];           // alinhado ao enunciado
@@ -50,7 +57,7 @@ public:
 
     void criarArquivoVazio();
     void inserir(const Registro& r);
-    void inserirEmLote(const vector<Registro>& regs);
+    vector<loteReturn> inserirEmLote(const vector<Registro>& regs);
     bool buscar(int id, Registro& encontrado);
 
     // métricas

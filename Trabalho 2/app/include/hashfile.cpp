@@ -17,14 +17,15 @@ long long HashFile::fileSizeBytes() const {
 
 // Criação instantânea via ftruncate
 void HashFile::criarArquivoVazio() {
+    cout << filePath.c_str() << "\n\n";
     int fd = open(filePath.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
     if (fd == -1) {
-        perror("❌ Erro ao criar arquivo de dados");
+        perror("Erro ao criar arquivo de dados");
         return;
     }
     off_t tamanho = (off_t)numBuckets * bucketSize * sizeof(Registro);
     if (ftruncate(fd, tamanho) != 0) {
-        perror("❌ Erro no ftruncate");
+        perror("Erro no ftruncate");
     } else {
         cout << "📁 Arquivo de dados alocado com "
              << (tamanho / (1024.0 * 1024.0)) << " MB." << endl;
@@ -39,8 +40,9 @@ int HashFile::hashFunction(int key) const {
 }
 
 // Inserção em lote ultra-rápida: escrita sequencial bucket a bucket
-void HashFile::inserirEmLote(const vector<Registro>& regs) {
-    if (regs.empty()) return;
+vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
+    vector<loteReturn> indices; // <-- vetor que será retornado
+    if (regs.empty()) return indices;
 
     // Agrupar registros por bucket
     vector<vector<Registro>> buckets(numBuckets);
@@ -52,7 +54,7 @@ void HashFile::inserirEmLote(const vector<Registro>& regs) {
     fstream file(filePath, ios::in | ios::out | ios::binary);
     if (!file.is_open()) {
         cerr << "❌ Erro ao abrir arquivo de dados: " << filePath << endl;
-        return;
+        return indices;
     }
 
     const long long tamRegistro = sizeof(Registro);
@@ -65,32 +67,44 @@ void HashFile::inserirEmLote(const vector<Registro>& regs) {
 
         long registrosEscritos = 0;
         for (auto& r : buckets[b]) {
+            long long pos = 0; // posição real do registro
             if (registrosEscritos >= bucketSize) {
                 // bucket cheio: encadeia no final do arquivo
                 file.seekp(0, ios::end);
-                long long newOffset = static_cast<long long>(file.tellp());
+                pos = static_cast<long long>(file.tellp());
                 r.prox = -1;
                 file.write(reinterpret_cast<const char*>(&r), sizeof(Registro));
 
                 // atualizar encadeamento do anterior
                 if (registrosEscritos > 0) {
-                    long long prevOffset = newOffset - sizeof(Registro);
+                    long long prevOffset = pos - sizeof(Registro);
                     Registro anterior{};
                     file.seekg(prevOffset);
                     file.read(reinterpret_cast<char*>(&anterior), sizeof(Registro));
-                    anterior.prox = (int32_t)newOffset;
+                    anterior.prox = static_cast<int32_t>(pos);
                     file.seekp(prevOffset);
                     file.write(reinterpret_cast<const char*>(&anterior), sizeof(Registro));
                 }
             } else {
+                pos = base + registrosEscritos * tamRegistro;
                 file.write(reinterpret_cast<const char*>(&r), sizeof(Registro));
                 registrosEscritos++;
             }
+
+            // registra (id, posição) para o índice B+
+            loteReturn novo;
+            novo.id = r.id;
+            strcmp(novo.titulo, r.titulo);
+            novo.pos = pos;
+            indices.push_back(novo);
         }
     }
 
     file.close();
-    cout << "🧩 Inserido lote de " << regs.size() << " registros (escrita bucketizada).\n" << flush;
+    cout << "🧩 Inserido lote de " << regs.size()
+         << " registros (escrita bucketizada).\n" << flush;
+
+    return indices; // <-- retorno adicionado
 }
 
 // Busca igual à versão anterior

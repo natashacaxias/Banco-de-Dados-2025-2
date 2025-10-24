@@ -6,10 +6,8 @@ using namespace std;
 using ptr = streampos;
 
 /*
-set /p M=< <(calcM.exe)
 g++ -DM=%M% bptreefile.cpp -o bptree.exe
 */
-
 
 template<typename key>
 int calcular_M(size_t tamanho_bloco) {

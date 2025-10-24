@@ -1,0 +1,8 @@
+g++ -I./include src/upload.cpp include/bptreefile.cpp include/hashfile.cpp -o bin/upload  
+
+g++ -I./include src/findrec.cpp include/bptreefile.cpp include/hashfile.cpp -o bin/findrec
+
+g++ -I./include src/seek1.cpp include/bptreefile.cpp .\include\hashfile.cpp -o bin/seek1
+
+g++ -I./include src/seek2.cpp include/bptreefile.cpp .\include\hashfile.cpp -o bin/seek2
+
