@@ -2,6 +2,7 @@
 #include <chrono>
 #include <fstream>
 #include "../include/hashfile.h"
+#include "../include/common.h"
 
 using namespace std;
 
@@ -18,10 +19,6 @@ int main(int argc, char* argv[]) {
 
     cout << "Arquivo de dados: " << dbPath << endl;
     cout << "Chave: " << chaveStr << endl;
-
-    // ⚠️ Deve bater com o que foi usado no upload
-    const int NUM_BUCKETS = 97;
-    const int BUCKET_SIZE = 4096;
 
     HashFile hashFile(dbPath, NUM_BUCKETS, BUCKET_SIZE);
     Registro r;

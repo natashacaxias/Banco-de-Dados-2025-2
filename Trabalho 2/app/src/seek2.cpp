@@ -2,6 +2,7 @@
 #include <chrono>
 #include <fstream>
 #include "../include/bptreefile.h"
+#include "../include/common.h"
 
 using namespace std;
 
@@ -34,12 +35,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // ⚠️ Deve bater com o que foi usado no upload
-    const int M = 64;
-
     // Define chave como array<char,300>
     using Chave = array<char,300>;
-    bp<Chave, M> bptree;
+    bp<Chave, M_TITULO> bptree;
     bptree.carregarArvore(&bptFile);
     Registro r;
 

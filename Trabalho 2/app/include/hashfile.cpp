@@ -2,16 +2,16 @@
 #include <bits/stdc++.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include "commom.h"
+#include "common.h"
 using namespace std;
 
 HashFile::HashFile(string path, int nb, int bs)
     : filePath(std::move(path)), numBuckets(nb), bucketSize(bs) {}
 
-long long HashFile::fileSizeBytes() const {
+int64_t HashFile::fileSizeBytes() const {
     ifstream f(filePath, ios::binary | ios::ate);
     if (!f.is_open()) return 0;
-    return static_cast<long long>(f.tellg());
+    return static_cast<int64_t>(f.tellg());
 }
 
 // Criação instantânea via ftruncate
@@ -40,7 +40,7 @@ int HashFile::hashFunction(int key) const {
 
 // Inserção em lote ultra-rápida: escrita sequencial bucket a bucket
 vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
-    vector<loteReturn> indices; // <-- vetor que será retornado
+    vector<loteReturn> indices;
     if (regs.empty()) return indices;
 
     // Agrupar registros por bucket
@@ -56,44 +56,96 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
         return indices;
     }
 
-    const long long tamRegistro = sizeof(Registro);
+    const int64_t tamRegistro = sizeof(Registro);
 
     for (int b = 0; b < numBuckets; b++) {
         if (buckets[b].empty()) continue;
 
-        long long base = 1LL * b * bucketSize * tamRegistro;
-        file.seekp(base, ios::beg);
+        int64_t base = 1LL * b * bucketSize * tamRegistro;
 
-        long registrosEscritos = 0;
-        for (auto& r : buckets[b]) {
-            long long pos = 0; // posição real do registro
-            if (registrosEscritos >= bucketSize) {
-                // bucket cheio: encadeia no final do arquivo
-                file.seekp(0, ios::end);
-                pos = static_cast<long long>(file.tellp());
-                r.prox = -1;
-                file.write(reinterpret_cast<const char*>(&r), sizeof(Registro));
+        // 1) Determinar quantos registros já ocupam a área primária deste bucket
+        int64_t registrosEscritos = 0;
+        Registro tmp{};
+        file.clear();
+        file.seekg(base, ios::beg);
 
-                // atualizar encadeamento do anterior
-                if (registrosEscritos > 0) {
-                    long long prevOffset = pos - sizeof(Registro);
-                    Registro anterior{};
-                    file.seekg(prevOffset);
-                    file.read(reinterpret_cast<char*>(&anterior), sizeof(Registro));
-                    anterior.prox = static_cast<int32_t>(pos);
-                    file.seekp(prevOffset);
-                    file.write(reinterpret_cast<const char*>(&anterior), sizeof(Registro));
-                }
+        // Percorre a área primária procurando primeira posição livre (id == 0)
+        for (int i = 0; i < bucketSize; ++i) {
+            file.read(reinterpret_cast<char*>(&tmp), sizeof(Registro));
+            if (!file) { file.clear(); break; }
+            if (tmp.id == 0) { // assumimos id==0 => slot livre (criararquivo preenche com zeros)
+                registrosEscritos = i;
+                break;
+            }
+            registrosEscritos = i + 1;
+        }
+
+        // 2) Se já houver overflow, achar o último nó da cadeia para linkar novos appends
+        int64_t lastChainPos = -1;
+        if (registrosEscritos >= bucketSize) {
+            // Pega o último slot primário e percorre o campo prox até -1
+            int64_t lastPrimaryPos = base + (bucketSize - 1) * tamRegistro;
+            file.seekg(lastPrimaryPos, ios::beg);
+            file.read(reinterpret_cast<char*>(&tmp), sizeof(Registro));
+            int64_t prox = tmp.prox;
+            if (prox == -1) {
+                lastChainPos = lastPrimaryPos;
             } else {
+                // percorre os nós de overflow até o fim
+                int64_t cur = prox;
+                while (cur != -1) {
+                    file.seekg(cur, ios::beg);
+                    file.read(reinterpret_cast<char*>(&tmp), sizeof(Registro));
+                    if (tmp.prox == -1) {
+                        lastChainPos = cur;
+                        break;
+                    }
+                    cur = tmp.prox;
+                }
+                // se nunca leu com sucesso, lastChainPos permanece -1 (tratamento abaixo)
+            }
+        }
+
+        // 3) Inserir registros do lote para este bucket
+        for (auto rcopy : buckets[b]) {
+            int64_t pos = 0;
+            if (registrosEscritos < bucketSize) {
+                // grava na área primária na primeira posição livre
                 pos = base + registrosEscritos * tamRegistro;
-                file.write(reinterpret_cast<const char*>(&r), sizeof(Registro));
+                rcopy.prox = -1;
+                file.seekp(pos, ios::beg);
+                file.write(reinterpret_cast<const char*>(&rcopy), sizeof(Registro));
                 registrosEscritos++;
+            } else {
+                // overflow: append ao final do arquivo e linkar o último nó da cadeia
+                file.seekp(0, ios::end);
+                pos = static_cast<int64_t>(file.tellp());
+                rcopy.prox = -1;
+                file.write(reinterpret_cast<const char*>(&rcopy), sizeof(Registro));
+
+                // Atualiza ponteiro do último nó da cadeia para apontar para pos
+                if (lastChainPos == -1) {
+                    // tenta linkar ao último slot primário
+                    int64_t prevOffset = base + (bucketSize - 1) * tamRegistro;
+                    file.seekg(prevOffset, ios::beg);
+                    file.read(reinterpret_cast<char*>(&tmp), sizeof(Registro));
+                    tmp.prox = static_cast<int64_t>(pos);
+                    file.seekp(prevOffset, ios::beg);
+                    file.write(reinterpret_cast<const char*>(&tmp), sizeof(Registro));
+                } else {
+                    file.seekg(lastChainPos, ios::beg);
+                    file.read(reinterpret_cast<char*>(&tmp), sizeof(Registro));
+                    tmp.prox = static_cast<int64_t>(pos);
+                    file.seekp(lastChainPos, ios::beg);
+                    file.write(reinterpret_cast<const char*>(&tmp), sizeof(Registro));
+                }
+                lastChainPos = pos;
             }
 
             // registra (id, posição) para o índice B+
             loteReturn novo;
-            novo.id = r.id;
-            strncpy(novo.titulo.data(), r.titulo.data(), sizeof(novo.titulo) - 1);
+            novo.id = rcopy.id;
+            strncpy(novo.titulo.data(), rcopy.titulo.data(), sizeof(novo.titulo) - 1);
             novo.titulo.data()[sizeof(novo.titulo) - 1] = '\0';
             novo.pos = pos;
             indices.push_back(novo);
@@ -102,9 +154,9 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
 
     file.close();
     cout << "🧩 Inserido lote de " << regs.size()
-         << " registros (escrita bucketizada).\n" << flush;
+         << " registros (escrita bucketizada, sem sobrescrita).\n" << flush;
 
-    return indices; // <-- retorno adicionado
+    return indices;
 }
 
 // Busca igual à versão anterior
@@ -113,7 +165,7 @@ bool HashFile::buscar(int id, Registro& encontrado) {
     fstream file(filePath, ios::in | ios::binary);
     if (!file.is_open()) return false;
 
-    const long long base = 1LL * hashFunction(id) * bucketSize * regSize();
+    const int64_t base = 1LL * hashFunction(id) * bucketSize * regSize();
     Registro temp{};
 
     for (int i = 0; i < bucketSize; i++) {
@@ -128,7 +180,7 @@ bool HashFile::buscar(int id, Registro& encontrado) {
             return true;
         }
 
-        int32_t prox = temp.prox;
+        int64_t prox = temp.prox;
         while (prox != -1) {
             file.seekg(prox, ios::beg);
             file.read(reinterpret_cast<char*>(&temp), sizeof(Registro));
@@ -148,7 +200,7 @@ bool HashFile::buscar(int id, Registro& encontrado) {
 }
 
 long HashFile::getTotalBlocos() const {
-    long long bytes = fileSizeBytes();
+    int64_t bytes = fileSizeBytes();
     if (bytes <= 0) return 0;
     return static_cast<long>(bytes / regSize());
 }

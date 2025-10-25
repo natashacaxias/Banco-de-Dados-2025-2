@@ -2,6 +2,7 @@
 #include <chrono>
 #include <fstream>
 #include "../include/bptreefile.h"
+#include "../include/common.h"
 
 using namespace std;
 
@@ -29,17 +30,12 @@ int main(int argc, char* argv[]) {
 
     // Abre arquivo de dados
     fstream db("./data/data.db", ios::in | ios::out | ios::binary);
-    if (!bptFile.is_open()) {
+    if (!db.is_open()) {
         cerr << "Erro ao abrir arquivo de dados: ./data/data.db" << endl;
         return 1;
     }
 
-    // ⚠️ Deve bater com o que foi usado no upload
-    const int NUM_BUCKETS = 97;
-    const int BUCKET_SIZE = 4096;
-    const int M = 64;
-
-    bp<int, M> bptree;
+    bp<int, M_ID> bptree;
     bptree.carregarArvore(&bptFile);
     Registro r;
 

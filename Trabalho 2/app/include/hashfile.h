@@ -5,7 +5,7 @@
 #include <vector>
 #include <cstdint>
 #include <array>
-#include "commom.h"
+#include "common.h"
 using namespace std;
 
 // =====================
@@ -13,7 +13,7 @@ using namespace std;
 // =====================
 
 struct loteReturn{
-    long long pos;
+    int64_t pos;
     array<char,300> titulo;
     int id;
 };
@@ -41,7 +41,7 @@ private:
     long blocosLidos = 0;
 
     // helpers
-    long long fileSizeBytes() const;
+    int64_t fileSizeBytes() const;
 
 public:
     HashFile(string path, int nb, int bs);

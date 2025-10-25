@@ -4,4 +4,4 @@ __pycache__/
 
 # arquivos de sistema
 .DS_Store
-app/data/artigo.csv.gz
+app/data/*

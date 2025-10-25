@@ -1,7 +1,7 @@
 import csv
 import re
 
-ARQUIVO_ENTRADA = "../data/artigo_teste.csv"
+ARQUIVO_ENTRADA = "../data/artigo.csv"
 ARQUIVO_SAIDA = "../data/artigo_corrigido.csv"
 ARQUIVO_LOG = "../data/erros_csv.log"
 

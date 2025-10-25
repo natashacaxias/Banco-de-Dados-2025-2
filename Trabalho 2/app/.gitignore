@@ -1,5 +1,0 @@
-# arquivos grandes e gerados
-data/*.db
-data/*.csv
-data/*.log
-*.DS_Store
