@@ -6,8 +6,8 @@ using namespace std;
 using ptr = int64_t;
 
 // Constantes
-const int NUM_BUCKETS = 97;
-const int BUCKET_SIZE = 4096;
+const int NUM_BUCKETS = 100003;
+const int BUCKET_SIZE = 10;
 const int BATCH_SIZE = 10000;
 const int PROGRESS_STEP = 50000;
 const int M_ID = 341;

@@ -9,7 +9,7 @@ using namespace std;
 int main(int argc, char* argv[]) {
     cout << "=== TP2 – Busca por id (findrec) ===" << endl;
 
-    if (argc < 1) {
+    if (argc < 2) {
         cerr << "Uso: ./bin/findrec.exe <chave>" << endl;
         return 1;
     }

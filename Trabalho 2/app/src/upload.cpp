@@ -166,6 +166,8 @@ int main(int argc, char* argv[]) {
                     bptreeTitulo.inserir(tituloArray, lr.pos);
                 }
             }
+            bptreeId.salvarMetadados();
+            bptreeTitulo.salvarMetadados();
             buffer.clear();
         }
 

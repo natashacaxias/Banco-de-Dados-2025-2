@@ -3,6 +3,8 @@
 using namespace std;
 using ptr = int64_t;
 
+constexpr ptr BPTREE_HEADER_SIZE = static_cast<ptr>(3 * sizeof(ptr));
+
 // ===== Nó da árvore (pode ser folha ou nó interno) =====
 template<typename key, int M>
 struct no{
@@ -383,27 +385,67 @@ struct bp{
     fstream* file;
     unique_ptr<PageCache<key,M>> cache;
 
-    // Inicializa a árvore e o cache
     void iniciar(fstream* f){
         this->file = f;
         this->cache = make_unique<PageCache<key,M>>(f);
         this->cache->setFile(f);
 
+        // 1) Reserve espaço de cabeçalho (apenas se arquivo estiver vazio)
+        f->clear();
+        f->seekg(0, ios::end);
+        auto fileSize = f->tellg();
+        if (fileSize == 0) {
+            // escreve header placeholder com zeros para reservar espaço
+            std::vector<char> header(BPTREE_HEADER_SIZE, 0);
+            f->seekp(0, ios::beg);
+            f->write(header.data(), header.size());
+            f->flush();
+        }
+
+        // 2) agora criar raiz e escrevê-la (será escrita após o header)
         no<key, M> raiz; 
-        // já default-inicializado via construtor
         raiz.folha = true; raiz.qtdKeys = 0;
-        // Inicializa ponteiros com -1 por segurança (construtor já fez isso, repetimos por clareza)
         for (int i = 0; i < M+2; ++i) raiz.ponteiros[i] = static_cast<ptr>(-1);
-        this->raiz = escrever(f, &raiz, cache.get());
+
+        this->raiz = escrever(f, &raiz, cache.get()); // escrever() faz seekp(0, ios::end)
         this->qtd_nos += 1;
         this->primeiraFolha = this->raiz;
+
+        // SALVA METADADOS no início do arquivo
+        salvarMetadados();
     }
 
+    // NOVO: Salva metadados no início do arquivo
+    void salvarMetadados() {
+        if (!file) return;
+        file->seekp(0);
+        file->write(reinterpret_cast<const char*>(&raiz), sizeof(ptr));
+        file->write(reinterpret_cast<const char*>(&primeiraFolha), sizeof(ptr));
+        file->write(reinterpret_cast<const char*>(&qtd_nos), sizeof(ptr));
+        file->flush();
+    }
+
+    // MODIFICADO: Carrega metadados corretamente
     void carregarArvore(fstream* f){
         this->file = f;
         this->cache = make_unique<PageCache<key,M>>(f);
         this->cache->setFile(f);
-        this->raiz = static_cast<ptr>(0);
+
+        f->clear();
+        f->seekg(0, ios::end);
+        auto fileSize = f->tellg();
+        if (fileSize < static_cast<std::streamoff>(BPTREE_HEADER_SIZE)) {
+            // Arquivo não tem header válido — tratar como árvore vazia
+            this->raiz = static_cast<ptr>(-1);
+            this->primeiraFolha = static_cast<ptr>(-1);
+            this->qtd_nos = 0;
+            return;
+        }
+
+        f->seekg(0, ios::beg);
+        f->read(reinterpret_cast<char*>(&raiz), sizeof(ptr));
+        f->read(reinterpret_cast<char*>(&primeiraFolha), sizeof(ptr));
+        f->read(reinterpret_cast<char*>(&qtd_nos), sizeof(ptr));
     }
 
     // Força flush do cache para disco
