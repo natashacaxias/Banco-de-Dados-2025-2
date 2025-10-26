@@ -66,10 +66,7 @@ int main(int argc, char* argv[]) {
     cout << "\nEstatisticas da busca em dados:" << endl;
     cout << "Blocos lidos nos dados: " << res.second << endl;
     cout << "Tempo de busca nos dados: " << tempoBuscaDados << " ms" << endl;
-
-    cout << "\nEstatisticas Gerais:" << endl;
-    cout << fixed << setprecision(2);
-    //cout << "Total de blocos no arquivo: " << bptree.getTotalBlocos() << endl;
+    cout << "Total de blocos no arquivo: " << bptree.contarBlocos() << endl;
 
     return 0;
 }

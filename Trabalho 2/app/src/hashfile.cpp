@@ -1,8 +1,7 @@
-#include "hashfile.h"
+#include "../include/hashfile.h"
 #include <bits/stdc++.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include "common.h"
 using namespace std;
 
 HashFile::HashFile(string path, int nb, int bs)
@@ -26,7 +25,7 @@ void HashFile::criarArquivoVazio() {
     if (ftruncate(fd, tamanho) != 0) {
         perror("Erro no ftruncate");
     } else {
-        cout << "📁 Arquivo de dados alocado com "
+        cout << "Arquivo de dados alocado com "
              << (tamanho / (1024.0 * 1024.0)) << " MB." << endl;
     }
     close(fd);
@@ -44,14 +43,14 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
     indices.reserve(regs.size());
     if (regs.empty()) return indices;
 
-    // 1️⃣ Agrupar registros por bucket (sem alterar a ordem global)
+    // Agrupar registros por bucket (sem alterar a ordem global)
     vector<vector<pair<int, Registro>>> buckets(numBuckets);
     for (size_t i = 0; i < regs.size(); ++i) {
         int b = hashFunction(regs[i].id);
         buckets[b].push_back({static_cast<int>(i), regs[i]}); // guarda o índice original
     }
 
-    // 2️⃣ Abrir arquivo de dados
+    // Abrir arquivo de dados
     fstream file(filePath, ios::in | ios::out | ios::binary);
     if (!file.is_open()) {
         cerr << "Erro ao abrir arquivo de dados: " << filePath << endl;
@@ -61,7 +60,7 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
     const int64_t tamRegistro = sizeof(Registro);
     unordered_map<int, int64_t> idToPos; // id → posição real
 
-    // 3️⃣ Inserir bucket por bucket
+    // Inserir bucket por bucket
     for (int b = 0; b < numBuckets; b++) {
         if (buckets[b].empty()) continue;
 
@@ -105,7 +104,7 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
             }
         }
 
-        // 4️⃣ Escrever registros deste bucket
+        // Escrever registros deste bucket
         for (auto [origIndex, rcopy] : buckets[b]) {
             int64_t pos = 0;
             if (registrosOcupados < bucketSize) {
@@ -146,7 +145,7 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
 
     file.flush();
 
-    // 5️⃣ Monta vetor de retorno na mesma ordem do vetor original
+    // Monta vetor de retorno na mesma ordem do vetor original
     indices.reserve(regs.size());
     for (const auto& r : regs) {
         loteReturn lr{};
@@ -157,8 +156,8 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
         indices.push_back(lr);
     }
 
-    cout << "🧩 Inserido lote de " << regs.size()
-         << " registros (ordem preservada e offsets consistentes).\n";
+    cout << "Inserido lote de " << regs.size()
+         << " registros.\n";
 
     return indices;
 }

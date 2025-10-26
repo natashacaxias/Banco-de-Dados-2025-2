@@ -26,7 +26,6 @@ struct no{
 };
 
 // ===== Cache de páginas (LRU) para reduzir I/O =====
-// Parâmetro CACHE_SIZE ajustável; default razoável (64 páginas)
 template<typename key, int M, size_t CACHE_SIZE = 64>
 class PageCache {
 public:
@@ -186,7 +185,6 @@ struct KeyOps<array<char, N>> {
         return strcmp(a.data(), b.data()) == 0;
     }
     static void copy(array<char, N>& dest, const array<char, N>& src) {
-        // CORREÇÃO: Zera o destino antes de copiar
         memset(dest.data(), 0, N);
         strncpy(dest.data(), src.data(), N-1);
         dest[N-1] = '\0'; // Garante terminação
@@ -425,7 +423,7 @@ struct bp{
         file->flush();
     }
 
-    // MODIFICADO: Carrega metadados corretamente
+    // Carrega metadados
     void carregarArvore(fstream* f){
         this->file = f;
         this->cache = make_unique<PageCache<key,M>>(f);
@@ -451,6 +449,19 @@ struct bp{
     // Força flush do cache para disco
     void flushCache() {
         if (cache) cache->flush();
+    }
+
+    ptr contarBlocos() { 
+        if (!file) return static_cast<ptr>(0); 
+        flushCache(); 
+        file->clear(); file->seekg(0, ios::end); 
+        streamoff fileSize = file->tellg(); 
+        if (fileSize <= static_cast<streamoff>(BPTREE_HEADER_SIZE))
+            return static_cast<ptr>(0);
+         
+        streamoff dataBytes = fileSize - static_cast<streamoff>(BPTREE_HEADER_SIZE); 
+        ptr nodeSize = static_cast<ptr>(sizeof(no<key, M>)); ptr total = static_cast<ptr>(dataBytes / static_cast<streamoff>(nodeSize)); 
+        return total; 
     }
 
     pair<bool, long> buscar(key alvo, Registro& encontrado, fstream* db){
@@ -578,6 +589,4 @@ struct bp{
     }
 };
 
-// template struct bp<array<char,300>, 14>;
-// template struct bp<int, 341>;
 
