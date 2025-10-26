@@ -9,15 +9,17 @@
 using namespace std;
 
 // =====================
-// Estruturas
+// Estruturas auxiliares
 // =====================
 
-struct loteReturn{
+// retorno da inserção em lote (posição e título do registro)
+struct loteReturn {
     int64_t pos;
     array<char,300> titulo;
     int id;
 };
 
+// representação de uma linha do CSV (antes de virar Registro)
 struct RegistroCSV {
     int id;
     string titulo;
@@ -29,34 +31,39 @@ struct RegistroCSV {
 };
 
 // =====================
-// Classe principal
+// Classe principal do arquivo hash
 // =====================
 class HashFile {
 private:
-    string filePath;   // caminho do arquivo físico
-    int numBuckets;    // número total de buckets
-    int bucketSize;    // número de registros por bucket (na área primária)
+    string filePath;    // caminho do arquivo .db
+    int numBuckets;     // total de buckets
+    int bucketSize;     // registros por bucket
+    long blocosLidos = 0; // contador de blocos acessados
 
-    // estatísticas internas (para a operação corrente)
-    long blocosLidos = 0;
-
-    // helpers
-    int64_t fileSizeBytes() const;
+    int64_t fileSizeBytes() const; // tamanho do arquivo em bytes
 
 public:
+    // construtor
     HashFile(string path, int nb, int bs);
 
+    // cria o arquivo base vazio
     void criarArquivoVazio();
+
+    // insere um registro individual
     void inserir(const Registro& r);
+
+    // insere vários registros de uma vez
     vector<loteReturn> inserirEmLote(const vector<Registro>& regs);
+
+    // busca um registro pelo ID
     bool buscar(int id, Registro& encontrado);
 
     // métricas
     long getBlocosLidos() const { return blocosLidos; }
-    long getTotalBlocos() const; // total de "blocos" = número de registros no arquivo
+    long getTotalBlocos() const; // retorna total de registros gravados
     void resetarMetricas() { blocosLidos = 0; }
 
-    // util
+    // função hash principal (define bucket)
     int hashFunction(int key) const;
 };
 
