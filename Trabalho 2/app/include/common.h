@@ -3,32 +3,34 @@
 
 #include <bits/stdc++.h>
 using namespace std;
-using ptr = int64_t;
+using ptr = int64_t; // tipo para posições no arquivo
 
-// Força alinhamento de 1 byte — gravação binária exata
+// gravação binária exata (sem padding)
 #pragma pack(push, 1)
 
-// Constantes
-const int NUM_BUCKETS = 100003;
-const int BUCKET_SIZE = 10;
-const int BATCH_SIZE = 10000;
-const int PROGRESS_STEP = 50000;
-const int M_ID = 341;
-const int M_TITULO = 14;
+// --- Constantes principais ---
+const int NUM_BUCKETS = 100003;   // nº de buckets do hash
+const int BUCKET_SIZE = 10;       // registros por bucket
+const int BATCH_SIZE = 10000;     // lote de leitura no upload
+const int PROGRESS_STEP = 50000;  // passo para exibir progresso
+const int M_ID = 341;             // ordem da B+Tree (índice por ID)
+const int M_TITULO = 14;          // ordem da B+Tree (índice por título)
 
+// --- Estrutura do registro no arquivo de dados ---
 struct Registro {
-    int id;
-    array<char,300> titulo;           
-    char ano[8];
-    char autores[150];          
-    char citacoes[16];
-    char data_atualizacao[32];
-    char snippet[1024];         
-    ptr prox;              
+    int id;                       // identificador
+    array<char,300> titulo;       // título do artigo
+    char ano[8];                  // ano de publicação
+    char autores[150];            // lista de autores
+    char citacoes[16];            // nº de citações
+    char data_atualizacao[32];    // data/hora da última atualização
+    char snippet[1024];           // resumo do artigo
+    ptr prox;                     // ponteiro p/ encadeamento no hash
 };
 
 #pragma pack(pop)
 
+// retorna o tamanho de um registro (em bytes)
 static inline ptr regSize() { return static_cast<ptr>(sizeof(Registro)); }
 
 #endif
