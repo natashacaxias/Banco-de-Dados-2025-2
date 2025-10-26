@@ -6,7 +6,6 @@
 #include <array>
 
 #ifdef _WIN32
-    #define byte unsigned char   // necessário antes de windows.h
     #include <windows.h>
 #else
     #include <sys/statvfs.h>     // usado em Linux/Unix
@@ -16,7 +15,18 @@ using namespace std;
 
 // calcula a ordem M da B+Tree (nº máx. de chaves por nó)
 int calcularM(int tamBloco, int tamTipo, int tamPoint) {
-    return floor(tamBloco / static_cast<float>(tamPoint + tamTipo));
+    // relembrando a estrutura do nó
+        // struct no {
+        // ptr ponteiros[M+2];  
+        // key keys[M+1];       // vetor de chaves armazenadas no nó
+        // int qtdKeys;         // número de chaves usadas
+        // bool folha; 
+
+    // overhead
+    int o = sizeof(int) + sizeof(bool);  // qtdKeys e folha
+    o += tamTipo + 2*tamPoint; // espaços extra nos vetores para inserções temporárias
+
+    return max(2,(tamBloco+tamTipo-o)/(tamTipo+tamPoint));
 }
 
 // classe utilitária para obter informações do disco
@@ -57,10 +67,10 @@ public:
              << (block_size / 1024.0) << " KB)" << endl;
 
         // mostra cálculo das ordens da B+Tree para os dois índices
-        cout << "\nCálculo da ordem (M) da B+Tree:" << endl;
-        cout << "  - Chave ID (int): M = "
+        cout << "\nCalculo da ordem (M) da B+Tree:" << endl;
+        cout << "- Chave ID (int): M = "
              << calcularM(block_size, sizeof(int), sizeof(int64_t)) << endl;
-        cout << "  - Chave Título (char[300]): M = "
+        cout << "- Chave Titulo (char[300]): M = "
              << calcularM(block_size, 300, sizeof(int64_t)) << endl;
         cout << endl;
     }

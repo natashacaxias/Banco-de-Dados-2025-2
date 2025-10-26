@@ -13,8 +13,8 @@ const int NUM_BUCKETS = 100003;   // nº de buckets do hash
 const int BUCKET_SIZE = 10;       // registros por bucket
 const int BATCH_SIZE = 10000;     // lote de leitura no upload
 const int PROGRESS_STEP = 50000;  // passo para exibir progresso
-const int M_ID = 341;             // ordem da B+Tree (índice por ID)
-const int M_TITULO = 14;          // ordem da B+Tree (índice por título)
+const int M_ID = 339;             // ordem da B+Tree (índice por ID)
+const int M_TITULO = 13;          // ordem da B+Tree (índice por título)
 
 // --- Estrutura do registro no arquivo de dados ---
 struct Registro {

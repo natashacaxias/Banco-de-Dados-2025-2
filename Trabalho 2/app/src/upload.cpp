@@ -165,12 +165,8 @@ int main(int argc, char* argv[]) {
             // insere cada item nos índices B+
             for (loteReturn lr : indices) {
                 if (lr.pos != static_cast<int64_t>(-1)) {
-                    bptreeId.inserir(lr.id, lr.pos);
-                    array<char,300> tituloArray{};
-                    memset(tituloArray.data(), 0, sizeof(array<char,300>));
-                    strncpy(tituloArray.data(), lr.titulo.data(), sizeof(array<char,300>)-1);
-                    tituloArray[sizeof(array<char,300>)-1] = '\0';
-                    bptreeTitulo.inserir(tituloArray, lr.pos);
+                    bptreeId.inserir(lr.id, lr.pos);;
+                    bptreeTitulo.inserir(lr.titulo, lr.pos);
                 }
             }
             bptreeId.salvarMetadados();
@@ -198,11 +194,7 @@ int main(int argc, char* argv[]) {
         for (loteReturn lr : indices) {
             if (lr.pos != static_cast<int64_t>(-1)) {
                 bptreeId.inserir(lr.id, lr.pos);
-                array<char,300> tituloArray{};
-                memset(tituloArray.data(), 0, sizeof(array<char,300>));
-                strncpy(tituloArray.data(), lr.titulo.data(), sizeof(array<char,300>)-1);
-                tituloArray[sizeof(array<char,300>)-1] = '\0';
-                bptreeTitulo.inserir(tituloArray, lr.pos);
+                bptreeTitulo.inserir(lr.titulo, lr.pos);
             }
         }
     }
