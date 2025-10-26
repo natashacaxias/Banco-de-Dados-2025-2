@@ -7,7 +7,9 @@
 using namespace std;
 
 int main(int argc, char* argv[]) {
-    cout << "=== TP2 - Busca por id (seek1) ===" << endl;
+    auto inicioTotal = chrono::high_resolution_clock::now();
+    
+    cout << "=== Busca por id (seek1) ===" << endl;
 
     // verifica se foi passada a chave (ID)
     if (argc < 2) {
@@ -25,7 +27,7 @@ int main(int argc, char* argv[]) {
     // abre o arquivo de índice B+ (índice primário por ID)
     fstream bptFile("/data/bptreeId.idx", ios::in | ios::out | ios::binary);
     if (!bptFile.is_open()) {
-        cerr << "Erro ao abrir arquivo de índice B+ para IDs: /data/bptreeId.idx" << endl;
+        cerr << "Erro ao abrir arquivo de indice B+ para IDs: /data/bptreeId.idx" << endl;
         return 1;
     }
 
@@ -70,6 +72,14 @@ int main(int argc, char* argv[]) {
     cout << "\nEstatisticas da busca em dados:" << endl;
     cout << "Blocos lidos nos dados: " << res.second << endl;
     cout << "Tempo de busca nos dados: " << tempoBuscaDados << " ms" << endl;
+    cout << "Total de blocos no arquivo: " << bptree.contarBlocos() << endl;
+
+    auto fimTotal = chrono::high_resolution_clock::now();
+    double tempoTotal = chrono::duration<double, milli>(fimTotal - inicioTotal).count();
+
+    cout << "\nEstatísticas Gerais:" << endl;
+    cout << fixed << setprecision(2);
+    cout << "Tempo total de execucao: " << tempoTotal << " ms" << endl;
     cout << "Total de blocos no arquivo: " << bptree.contarBlocos() << endl;
 
     return 0;

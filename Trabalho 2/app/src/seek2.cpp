@@ -7,7 +7,9 @@
 using namespace std;
 
 int main(int argc, char* argv[]) {
-    cout << "=== TP2 - Busca por titulo (seek2) ===" << endl;
+    auto inicioTotal = chrono::high_resolution_clock::now();
+
+    cout << "=== Busca por titulo (seek2) ===" << endl;
 
     // verifica se foi passada a chave (título)
     if (argc < 2) {
@@ -25,7 +27,7 @@ int main(int argc, char* argv[]) {
     // abre o índice B+ (secundário, por título)
     fstream bptFile(idxPath, ios::in | ios::out | ios::binary);
     if (!bptFile.is_open()) {
-        cerr << "Erro ao abrir arquivo de índice B+ para Titulo: " << idxPath << endl;
+        cerr << "Erro ao abrir arquivo de indice B+ para Titulo: " << idxPath << endl;
         return 1;
     }
 
@@ -76,6 +78,14 @@ int main(int argc, char* argv[]) {
     cout << "Blocos lidos nos dados: " << res.second << endl;
     cout << "Tempo de busca nos dados: " << tempoBuscaDados << " ms" << endl;
     cout << "Total de blocos: " << bptree.contarBlocos() << "\n";
+
+    auto fimTotal = chrono::high_resolution_clock::now();
+    double tempoTotal = chrono::duration<double, milli>(fimTotal - inicioTotal).count();
+
+    cout << "\nEstatísticas Gerais:" << endl;
+    cout << fixed << setprecision(2);
+    cout << "Tempo total de execucao: " << tempoTotal << " ms" << endl;
+    cout << "Total de blocos no arquivo: " << bptree.contarBlocos() << endl;
 
     return 0;
 }

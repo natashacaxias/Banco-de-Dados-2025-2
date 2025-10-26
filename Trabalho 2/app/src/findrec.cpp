@@ -7,7 +7,10 @@
 using namespace std;
 
 int main(int argc, char* argv[]) {
-    cout << "=== TP2 – Busca por id (findrec) ===" << endl;
+
+    auto inicioTotal = chrono::high_resolution_clock::now();
+
+    cout << "=== Busca por ID (findrec) ===" << endl;
 
     // verifica se o usuário passou o argumento (ID)
     if (argc < 2) {
@@ -25,13 +28,12 @@ int main(int argc, char* argv[]) {
     HashFile hashFile(dbPath, NUM_BUCKETS, BUCKET_SIZE);
     Registro r;
 
-    auto inicioTotal = chrono::high_resolution_clock::now();
     int id = stoi(chaveStr); // converte argumento para inteiro
 
     // inicia a busca no arquivo hash
     cout << "\nRecuperando registro do arquivo de dados..." << endl;
     auto inicioDados = chrono::high_resolution_clock::now();
-    
+
     bool encontrado = hashFile.buscar(id, r); // realiza a busca
     
     auto fimDados = chrono::high_resolution_clock::now();

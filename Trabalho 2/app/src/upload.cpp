@@ -80,6 +80,8 @@ RegistroCSV parseCSV(const string &linhaOriginal) {
 }
 
 int main(int argc, char* argv[]) {
+    auto inicioTotal = chrono::high_resolution_clock::now();
+
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
     cout.setf(std::ios::unitbuf);
@@ -226,6 +228,11 @@ int main(int argc, char* argv[]) {
     cout << "Indices B+ salvos em: /data/bptreeId.idx e /data/bptreeTitulo.idx\n";
     cout << "--------------------------------------------------------\n";
     cout << "Arquivo principal salvo em: /data/data.db\n";
+
+    auto fimTotal = chrono::high_resolution_clock::now();
+    double tempoTotal = chrono::duration<double, milli>(fimTotal - inicioTotal).count();
+
+    cout << "Tempo total de execucao: " << tempoTotal << " ms" << endl;
     
     return 0;
 }
