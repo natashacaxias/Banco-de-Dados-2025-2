@@ -230,7 +230,7 @@ struct KeyOps<array<char, N>> {
     static void copy(array<char, N>& dest, const array<char, N>& src) {
         memset(dest.data(), 0, N);
         strncpy(dest.data(), src.data(), N-1);
-        dest[N-1] = '\0';
+        //dest[N-1] = '\0';
     }
 
     static void print(const array<char, N>& k) {
@@ -426,8 +426,7 @@ pair<ptr, int> acharFolha(fstream *file, ptr pRaiz, key& alvo, stack<ptr> *pilha
         
         // busca binária pra encontrar o ponteiro certo
         int i = upper_bound(noAtual.keys, noAtual.keys + noAtual.qtdKeys, alvo, comp<key>()) - noAtual.keys;
-
-        // avança para o próximo nó
+        
         pAtual = noAtual.ponteiros[i];
     }
     // retorna o ponteiro da folha e a quantidade de blocos lidos

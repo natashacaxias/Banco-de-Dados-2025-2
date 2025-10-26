@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
     Chave chave{};
     memset(chave.data(), 0, sizeof(Chave));
     strncpy(chave.data(), chaveStr.c_str(), sizeof(Chave));
-    chave.data()[sizeof(Chave)-1] = '\0';
+    //chave.data()[sizeof(Chave)-1] = '\0';
 
     // realiza a busca no índice
     cout << "\nRecuperando registro do arquivo de dados..." << endl;
