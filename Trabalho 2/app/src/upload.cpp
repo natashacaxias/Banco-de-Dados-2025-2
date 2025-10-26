@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
     cout << "Iniciando upload interativo do arquivo: " << caminhoCSV << "\n";
     cout << "--------------------------------------------------------\n";
 
-    HashFile hashFile("./data/data.db", NUM_BUCKETS, BUCKET_SIZE);
+    HashFile hashFile("/data/data.db", NUM_BUCKETS, BUCKET_SIZE);
     hashFile.criarArquivoVazio();
 
     // Criação do arquivo de índice B+
@@ -100,16 +100,16 @@ int main(int argc, char* argv[]) {
     using tituloKey = array<char,300>; 
     
     // Garante que o diretório existe
-    system("mkdir -p ./data");
+    system("mkdir -p /data");
     
-    fstream bptFileId("./data/bptreeId.idx", ios::in | ios::out | ios::binary | ios::trunc);
+    fstream bptFileId("/data/bptreeId.idx", ios::in | ios::out | ios::binary | ios::trunc);
     if (!bptFileId.is_open()) {
-        cerr << "Erro ao criar arquivo de índice B+: ./data/bptreeId.idx\n";
+        cerr << "Erro ao criar arquivo de índice B+: /data/bptreeId.idx\n";
         return 1;
     }
-    fstream bptFileTitulo("./data/bptreeTitulo.idx", ios::in | ios::out | ios::binary | ios::trunc);
+    fstream bptFileTitulo("/data/bptreeTitulo.idx", ios::in | ios::out | ios::binary | ios::trunc);
     if (!bptFileTitulo.is_open()) {
-        cerr << "Erro ao criar arquivo de índice B+: ./data/bptreeTitulo.idx\n";
+        cerr << "Erro ao criar arquivo de índice B+: /data/bptreeTitulo.idx\n";
         return 1;
     }
 
@@ -222,9 +222,9 @@ int main(int argc, char* argv[]) {
     cout << "Total de blocos no arquivo: "
          << hashFile.getTotalBlocos() << endl;
 
-    cout << "Indices B+ salvos em: ./data/bptreeId.idx e ./data/bptreeTitulo.idx\n";
+    cout << "Indices B+ salvos em: /data/bptreeId.idx e /data/bptreeTitulo.idx\n";
     cout << "--------------------------------------------------------\n";
-    cout << "Arquivo principal salvo em: ./data/data.db\n";
+    cout << "Arquivo principal salvo em: /data/data.db\n";
     
     return 0;
 }
