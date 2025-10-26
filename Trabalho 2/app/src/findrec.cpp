@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
 
     auto inicioTotal = chrono::high_resolution_clock::now();
 
-    cout << "=== Busca por ID (findrec) ===" << endl;
+    cout << "\n=== Busca por ID (findrec) === \n" << endl;
 
     // verifica se o usuário passou o argumento (ID)
     if (argc < 2) {
@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
     cout << "\nEstatísticas Gerais:" << endl;
     cout << fixed << setprecision(2);
     cout << "Tempo total de execucao: " << tempoTotal << " ms" << endl;
-    cout << "Total de blocos no arquivo: " << hashFile.getTotalBlocos() << endl;
+    cout << "Total de blocos no arquivo: " << hashFile.getTotalBlocos() << "\n\n";
 
     return 0;
 }

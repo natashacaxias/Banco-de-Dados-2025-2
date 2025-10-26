@@ -9,7 +9,7 @@ using namespace std;
 int main(int argc, char* argv[]) {
     auto inicioTotal = chrono::high_resolution_clock::now();
     
-    cout << "=== Busca por id (seek1) ===" << endl;
+    cout << "\n === Busca por id (seek1) === \n" << endl;
 
     // verifica se foi passada a chave (ID)
     if (argc < 2) {
@@ -22,6 +22,7 @@ int main(int argc, char* argv[]) {
     string idxPath = "/data/bptreeId.idx";
 
     cout << "Arquivo de dados: " << dbPath << endl;
+    cout << "Arquivo de índices: " << idxPath << endl;
     cout << "Chave: " << chaveStr << endl;
 
     // abre o arquivo de índice B+ (índice primário por ID)
@@ -80,7 +81,7 @@ int main(int argc, char* argv[]) {
     cout << "\nEstatísticas Gerais:" << endl;
     cout << fixed << setprecision(2);
     cout << "Tempo total de execucao: " << tempoTotal << " ms" << endl;
-    cout << "Total de blocos no arquivo: " << bptree.contarBlocos() << endl;
+    cout << "Total de blocos no arquivo: " << bptree.contarBlocos() << "\n\n";
 
     return 0;
 }
