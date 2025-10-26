@@ -6,10 +6,10 @@
 
 using namespace std;
 
-// converte RegistroCSV → Registro fixo para escrita em disco
+// converte RegistroCSV em Registro fixo (para gravar no disco)
 Registro toRegistro(const RegistroCSV& csv) {
     Registro r;
-    memset(&r, 0, sizeof(Registro));
+    memset(&r, 0, sizeof(Registro)); // zera toda a estrutura
 
     r.id = csv.id;
     strncpy(r.titulo.data(), csv.titulo.c_str(), sizeof(r.titulo) - 1);
@@ -23,7 +23,7 @@ Registro toRegistro(const RegistroCSV& csv) {
     return r;
 }
 
-// Faz o parse da linha CSV separada por ';' (compatível Windows/Linux)
+// lê uma linha CSV e separa os campos por ';'
 RegistroCSV parseCSV(const string &linhaOriginal) {
     RegistroCSV reg{};
     if (linhaOriginal.empty()) {
@@ -31,10 +31,9 @@ RegistroCSV parseCSV(const string &linhaOriginal) {
         return reg;
     }
 
-    // 🔹 Cria cópia editável da linha original
     string linha = linhaOriginal;
 
-    // 🔧 Remove BOM UTF-8 (ocorre em arquivos salvos no Windows)
+    // remove BOM UTF-8 (caso venha de Windows)
     if (linha.size() >= 3 && 
         (unsigned char)linha[0] == 0xEF && 
         (unsigned char)linha[1] == 0xBB && 
@@ -42,29 +41,26 @@ RegistroCSV parseCSV(const string &linhaOriginal) {
         linha.erase(0, 3);
     }
 
-    // 🔧 Remove \r no final da linha (de arquivos CRLF)
-    if (!linha.empty() && linha.back() == '\r') {
-        linha.pop_back();
-    }
+    // remove \r do final (arquivos CRLF)
+    if (!linha.empty() && linha.back() == '\r') linha.pop_back();
 
-    // 🔹 Divide em campos
+    // separa os campos
     stringstream ss(linha);
     string campo;
     vector<string> campos;
     while (getline(ss, campo, ';')) {
-        // remove aspas extras no início e fim
         if (!campo.empty() && campo.front() == '"') campo.erase(0, 1);
         if (!campo.empty() && campo.back() == '"') campo.pop_back();
         campos.push_back(campo);
     }
 
-    // 🔹 Verifica número de campos
+    // verifica se há campos suficientes
     if (campos.size() < 7) {
         reg.id = 0;
         return reg;
     }
 
-    // 🔹 Converte ID com segurança
+    // tenta converter o ID
     try {
         reg.id = stoi(campos[0]);
     } catch (...) {
@@ -72,24 +68,23 @@ RegistroCSV parseCSV(const string &linhaOriginal) {
         return reg;
     }
 
-    // 🔹 Normaliza campos vazios
-    reg.titulo          = campos[1].empty() ? "Sem Titulo" : campos[1];
-    reg.ano             = campos[2].empty() ? "0000" : campos[2];
-    reg.autores         = campos[3].empty() ? "Sem Autores" : campos[3];
-    reg.citacoes        = campos[4].empty() ? "0" : campos[4];
-    reg.data_atualizacao= campos[5].empty() ? "0000-00-00" : campos[5];
-    reg.snippet         = campos[6].empty() ? "Sem Snippet" : campos[6];
+    // substitui campos vazios por valores padrão
+    reg.titulo           = campos[1].empty() ? "Sem Titulo"      : campos[1];
+    reg.ano              = campos[2].empty() ? "0000"            : campos[2];
+    reg.autores          = campos[3].empty() ? "Sem Autores"     : campos[3];
+    reg.citacoes         = campos[4].empty() ? "0"               : campos[4];
+    reg.data_atualizacao = campos[5].empty() ? "0000-00-00"      : campos[5];
+    reg.snippet          = campos[6].empty() ? "Sem Snippet"     : campos[6];
 
     return reg;
 }
-
-
 
 int main(int argc, char* argv[]) {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
     cout.setf(std::ios::unitbuf);
 
+    // verifica argumento do CSV
     if (argc < 2) {
         cerr << "Uso: ./bin/upload <arquivo.csv>\n";
         return 1;
@@ -105,14 +100,13 @@ int main(int argc, char* argv[]) {
     cout << "Iniciando upload interativo do arquivo: " << caminhoCSV << "\n";
     cout << "--------------------------------------------------------\n";
 
+    // cria o arquivo principal (hash)
     HashFile hashFile("/data/data.db", NUM_BUCKETS, BUCKET_SIZE);
     hashFile.criarArquivoVazio();
 
-    // Criação do arquivo de índice B+
+    // cria os arquivos de índice (B+ por ID e por Título)
     using idKey = int;
     using tituloKey = array<char,300>; 
-    
-    // Garante que o diretório existe
     system("mkdir -p /data");
     
     fstream bptFileId("/data/bptreeId.idx", ios::in | ios::out | ios::binary | ios::trunc);
@@ -135,10 +129,11 @@ int main(int argc, char* argv[]) {
     buffer.reserve(BATCH_SIZE);
 
     long totalLinhas = 0, inseridos = 0, invalidos = 0;
+
+    // conta linhas do arquivo
     {
         ifstream temp(caminhoCSV);
         string linhaTemp;
-        //getline(temp, linhaTemp); // Pula header
         while (getline(temp, linhaTemp)) {
             if (!linhaTemp.empty()) totalLinhas++;
         }
@@ -148,11 +143,9 @@ int main(int argc, char* argv[]) {
     auto start = chrono::high_resolution_clock::now();
     string linha;
 
-    // Pula header
-    //getline(arquivo, linha);
-
     cout << "Iniciando leitura e insercao..." << endl;
 
+    // leitura linha a linha do CSV
     while (getline(arquivo, linha)) {
         if (linha.empty()) continue;
 
@@ -165,17 +158,18 @@ int main(int argc, char* argv[]) {
         buffer.push_back(toRegistro(csv));
         inseridos++;
 
-        // Processa em lotes para eficiência
+        // processa o buffer em lotes
         if (buffer.size() >= BATCH_SIZE) {
             vector<loteReturn> indices = hashFile.inserirEmLote(buffer);
 
+            // insere cada item nos índices B+
             for (loteReturn lr : indices) {
                 if (lr.pos != static_cast<int64_t>(-1)) {
                     bptreeId.inserir(lr.id, lr.pos);
                     array<char,300> tituloArray{};
                     memset(tituloArray.data(), 0, sizeof(array<char,300>));
                     strncpy(tituloArray.data(), lr.titulo.data(), sizeof(array<char,300>)-1);
-                    tituloArray[sizeof(array<char,300>)-1] = '\0'; // Garante terminação
+                    tituloArray[sizeof(array<char,300>)-1] = '\0';
                     bptreeTitulo.inserir(tituloArray, lr.pos);
                 }
             }
@@ -184,6 +178,7 @@ int main(int argc, char* argv[]) {
             buffer.clear();
         }
 
+        // exibe progresso
         if (inseridos % PROGRESS_STEP == 0) {
             auto now = chrono::high_resolution_clock::now();
             double elapsed = chrono::duration<double>(now - start).count();
@@ -197,7 +192,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Processa último lote
+    // processa o último lote
     if (!buffer.empty()) {
         vector<loteReturn> indices = hashFile.inserirEmLote(buffer);
         for (loteReturn lr : indices) {
@@ -206,13 +201,13 @@ int main(int argc, char* argv[]) {
                 array<char,300> tituloArray{};
                 memset(tituloArray.data(), 0, sizeof(array<char,300>));
                 strncpy(tituloArray.data(), lr.titulo.data(), sizeof(array<char,300>)-1);
-                tituloArray[sizeof(array<char,300>)-1] = '\0'; // Garante terminação
+                tituloArray[sizeof(array<char,300>)-1] = '\0';
                 bptreeTitulo.inserir(tituloArray, lr.pos);
             }
         }
     }
 
-    // Força escrita de tudo no disco
+    // grava tudo no disco
     bptreeId.flushCache(); 
     bptreeTitulo.flushCache();
     bptFileId.flush(); 
@@ -223,6 +218,7 @@ int main(int argc, char* argv[]) {
     auto end = chrono::high_resolution_clock::now();
     double totalTime = chrono::duration<double>(end - start).count();
 
+    // resumo final
     cout << "\nUpload concluido!\n";
     cout << "Registros validos: " << inseridos
          << " | Invalidos: " << invalidos << "\n";
