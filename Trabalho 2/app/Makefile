@@ -87,17 +87,27 @@ docker-run-calcularM:
 docker-run-corrigir:
 	docker run --rm -v "$(PWD)/data:/data" tp2 python3 ./utils/corrigir_csv_artigo.py
 
-docker-run-upload:
-	docker run --rm -v "$(PWD)/data:/data" tp2 ./bin/upload /data/artigo_corrigido.csv
-
 docker-run-findrec:
-	@read -p "Digite o ID: " ID; docker run --rm -v "$(PWD)/data:/data" tp2 ./bin/findrec $$ID
+	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
+		echo "Uso: make docker-run-findrec <ID>"; exit 1; \
+	fi; \
+	ID=$(filter-out $@,$(MAKECMDGOALS)); \
+	docker run --rm -v "$(PWD)/data:/data" tp2 ./bin/findrec $$ID
 
 docker-run-seek1:
-	@read -p "Digite o ID: " ID; docker run --rm -v "$(PWD)/data:/data" tp2 ./bin/seek1 $$ID
+	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
+		echo "Uso: make docker-run-seek1 <ID>"; exit 1; \
+	fi; \
+	ID=$(filter-out $@,$(MAKECMDGOALS)); \
+	docker run --rm -v "$(PWD)/data:/data" tp2 ./bin/seek1 $$ID
 
 docker-run-seek2:
-	@read -p "Digite o Título: " TIT; docker run --rm -v "$(PWD)/data:/data" tp2 ./bin/seek2 "$$TIT"
+	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
+		echo "Uso: make docker-run-seek2 <Título>"; exit 1; \
+	fi; \
+	TITULO=$(filter-out $@,$(MAKECMDGOALS)); \
+	docker run --rm -v "$(PWD)/data:/data" tp2 ./bin/seek2 "$$TITULO"
+
 
 # ==========================================================
 #  4. LIMPEZA
