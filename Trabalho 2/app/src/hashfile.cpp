@@ -13,23 +13,36 @@ int64_t HashFile::fileSizeBytes() const {
     return static_cast<int64_t>(f.tellg());
 }
 
-// Criação instantânea via ftruncate
+// Criação segura do arquivo de dados: inicializa blocos com id=0 e prox=-1
 void HashFile::criarArquivoVazio() {
     cout << filePath.c_str() << "\n\n";
-    int fd = open(filePath.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
-    if (fd == -1) {
-        perror("Erro ao criar arquivo de dados");
+
+    fstream file(filePath, ios::out | ios::binary | ios::trunc);
+    if (!file.is_open()) {
+        cerr << "Erro ao criar arquivo de dados: " << filePath << endl;
         return;
     }
-    off_t tamanho = (off_t)numBuckets * bucketSize * sizeof(Registro);
-    if (ftruncate(fd, tamanho) != 0) {
-        perror("Erro no ftruncate");
-    } else {
-        cout << "Arquivo de dados alocado com "
-             << (tamanho / (1024.0 * 1024.0)) << " MB." << endl;
+
+    Registro vazio{};
+    vazio.id = 0;
+    vazio.prox = -1;
+
+    const int64_t totalRegistros = 1LL * numBuckets * bucketSize;
+    const double tamanhoMB = (totalRegistros * sizeof(Registro)) / (1024.0 * 1024.0);
+
+    cout << "📁 Criando arquivo de dados vazio..." << endl;
+    cout << "Total de registros: " << totalRegistros << endl;
+    cout << fixed << setprecision(3)
+         << "Tamanho estimado: " << tamanhoMB << " MB\n";
+
+    for (int64_t i = 0; i < totalRegistros; ++i) {
+        file.write(reinterpret_cast<const char*>(&vazio), sizeof(Registro));
     }
-    close(fd);
+
+    file.close();
+    cout << "✅ Arquivo de dados inicializado com sucesso." << endl;
 }
+
 
 int HashFile::hashFunction(int key) const {
     int m = numBuckets > 0 ? numBuckets : 1;

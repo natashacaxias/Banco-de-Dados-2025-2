@@ -5,6 +5,9 @@
 using namespace std;
 using ptr = int64_t;
 
+// Força alinhamento de 1 byte — gravação binária exata
+#pragma pack(push, 1)
+
 // Constantes
 const int NUM_BUCKETS = 100003;
 const int BUCKET_SIZE = 10;
@@ -23,6 +26,8 @@ struct Registro {
     char snippet[1024];         
     ptr prox;              
 };
+
+#pragma pack(pop)
 
 static inline ptr regSize() { return static_cast<ptr>(sizeof(Registro)); }
 

@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     }
 
     string chaveStr = argv[1];
-    string dbPath = "data/data.db";
+    string dbPath = "/data/data.db";
 
     cout << "Arquivo de dados: " << dbPath << endl;
     cout << "Chave: " << chaveStr << endl;

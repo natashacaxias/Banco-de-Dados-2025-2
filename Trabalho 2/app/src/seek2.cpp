@@ -15,8 +15,8 @@ int main(int argc, char* argv[]) {
     }
 
     string chaveStr = argv[1];
-    string dbPath = "data/data.db";
-    string idxPath = "data/bptreeTitulo.idx";
+    string dbPath = "/data/data.db";
+    string idxPath = "/data/bptreeTitulo.idx";
 
     cout << "Arquivo de dados: " << dbPath << endl;
     cout << "Chave: " << chaveStr << endl;

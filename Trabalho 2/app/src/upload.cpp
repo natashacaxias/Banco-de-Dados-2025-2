@@ -6,71 +6,84 @@
 
 using namespace std;
 
-// converte linha CSV → Registro fixo
+// converte RegistroCSV → Registro fixo para escrita em disco
 Registro toRegistro(const RegistroCSV& csv) {
-    Registro r{};
+    Registro r;
+    memset(&r, 0, sizeof(Registro));
+
     r.id = csv.id;
-    
-    // Garante terminação nula em todos os campos
     strncpy(r.titulo.data(), csv.titulo.c_str(), sizeof(r.titulo) - 1);
-    r.titulo[sizeof(r.titulo) - 1] = '\0';
-    
     strncpy(r.ano, csv.ano.c_str(), sizeof(r.ano) - 1);
-    r.ano[sizeof(r.ano) - 1] = '\0';
-    
     strncpy(r.autores, csv.autores.c_str(), sizeof(r.autores) - 1);
-    r.autores[sizeof(r.autores) - 1] = '\0';
-    
     strncpy(r.citacoes, csv.citacoes.c_str(), sizeof(r.citacoes) - 1);
-    r.citacoes[sizeof(r.citacoes) - 1] = '\0';
-    
     strncpy(r.data_atualizacao, csv.data_atualizacao.c_str(), sizeof(r.data_atualizacao) - 1);
-    r.data_atualizacao[sizeof(r.data_atualizacao) - 1] = '\0';
-    
     strncpy(r.snippet, csv.snippet.c_str(), sizeof(r.snippet) - 1);
-    r.snippet[sizeof(r.snippet) - 1] = '\0';
-    
+
     r.prox = -1;
     return r;
 }
 
-// faz o parse da linha CSV separada por ';'
-RegistroCSV parseCSV(const string &linha) {
+// Faz o parse da linha CSV separada por ';' (compatível Windows/Linux)
+RegistroCSV parseCSV(const string &linhaOriginal) {
     RegistroCSV reg{};
+    if (linhaOriginal.empty()) {
+        reg.id = 0;
+        return reg;
+    }
+
+    // 🔹 Cria cópia editável da linha original
+    string linha = linhaOriginal;
+
+    // 🔧 Remove BOM UTF-8 (ocorre em arquivos salvos no Windows)
+    if (linha.size() >= 3 && 
+        (unsigned char)linha[0] == 0xEF && 
+        (unsigned char)linha[1] == 0xBB && 
+        (unsigned char)linha[2] == 0xBF) {
+        linha.erase(0, 3);
+    }
+
+    // 🔧 Remove \r no final da linha (de arquivos CRLF)
+    if (!linha.empty() && linha.back() == '\r') {
+        linha.pop_back();
+    }
+
+    // 🔹 Divide em campos
     stringstream ss(linha);
     string campo;
     vector<string> campos;
-
     while (getline(ss, campo, ';')) {
-        if (!campo.empty() && campo.front() == '"')
-            campo.erase(0, 1);
-        if (!campo.empty() && campo.back() == '"')
-            campo.pop_back();
+        // remove aspas extras no início e fim
+        if (!campo.empty() && campo.front() == '"') campo.erase(0, 1);
+        if (!campo.empty() && campo.back() == '"') campo.pop_back();
         campos.push_back(campo);
     }
 
+    // 🔹 Verifica número de campos
     if (campos.size() < 7) {
         reg.id = 0;
         return reg;
     }
 
-    try { 
-        reg.id = stoi(campos[0]); 
-    } catch (...) { 
-        reg.id = 0; 
+    // 🔹 Converte ID com segurança
+    try {
+        reg.id = stoi(campos[0]);
+    } catch (...) {
+        reg.id = 0;
         return reg;
     }
-    
-    // Trata campos vazios
-    reg.titulo = campos[1].empty() ? "Sem Titulo" : campos[1];
-    reg.ano = campos[2].empty() ? "0000" : campos[2];
-    reg.autores = campos[3].empty() ? "Sem Autores" : campos[3];
-    reg.citacoes = campos[4].empty() ? "0" : campos[4];
-    reg.data_atualizacao = campos[5].empty() ? "0000-00-00" : campos[5];
-    reg.snippet = campos[6].empty() ? "Sem Snippet" : campos[6];
+
+    // 🔹 Normaliza campos vazios
+    reg.titulo          = campos[1].empty() ? "Sem Titulo" : campos[1];
+    reg.ano             = campos[2].empty() ? "0000" : campos[2];
+    reg.autores         = campos[3].empty() ? "Sem Autores" : campos[3];
+    reg.citacoes        = campos[4].empty() ? "0" : campos[4];
+    reg.data_atualizacao= campos[5].empty() ? "0000-00-00" : campos[5];
+    reg.snippet         = campos[6].empty() ? "Sem Snippet" : campos[6];
 
     return reg;
 }
+
+
 
 int main(int argc, char* argv[]) {
     ios::sync_with_stdio(false);
@@ -125,7 +138,7 @@ int main(int argc, char* argv[]) {
     {
         ifstream temp(caminhoCSV);
         string linhaTemp;
-        getline(temp, linhaTemp); // Pula header
+        //getline(temp, linhaTemp); // Pula header
         while (getline(temp, linhaTemp)) {
             if (!linhaTemp.empty()) totalLinhas++;
         }
@@ -136,7 +149,7 @@ int main(int argc, char* argv[]) {
     string linha;
 
     // Pula header
-    getline(arquivo, linha);
+    //getline(arquivo, linha);
 
     cout << "Iniciando leitura e insercao..." << endl;
 

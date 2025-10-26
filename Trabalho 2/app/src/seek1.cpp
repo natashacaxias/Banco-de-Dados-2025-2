@@ -15,23 +15,23 @@ int main(int argc, char* argv[]) {
     }
 
     string chaveStr = argv[1];
-    string dbPath = "data/data.db";
-    string idxPath = "data/bptreeId.idx";
+    string dbPath = "/data/data.db";
+    string idxPath = "/data/bptreeId.idx";
 
     cout << "Arquivo de dados: " << dbPath << endl;
     cout << "Chave: " << chaveStr << endl;
 
     // Abre arquivo de índice B+
-    fstream bptFile("./data/bptreeId.idx", ios::in | ios::out | ios::binary);
+    fstream bptFile("/data/bptreeId.idx", ios::in | ios::out | ios::binary);
     if (!bptFile.is_open()) {
-        cerr << "Erro ao abrir arquivo de índice B+ para IDs: ./data/bptreeId.idx" << endl;
+        cerr << "Erro ao abrir arquivo de índice B+ para IDs: /data/bptreeId.idx" << endl;
         return 1;
     }
 
     // Abre arquivo de dados
-    fstream db("./data/data.db", ios::in | ios::out | ios::binary);
+    fstream db("/data/data.db", ios::in | ios::out | ios::binary);
     if (!db.is_open()) {
-        cerr << "Erro ao abrir arquivo de dados: ./data/data.db" << endl;
+        cerr << "Erro ao abrir arquivo de dados: /data/data.db" << endl;
         return 1;
     }
 
