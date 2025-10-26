@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
 
     // Abre arquivo de dados
     fstream db(dbPath, ios::in | ios::out | ios::binary);
-    if (!db.is_open()) { // corrigido de bptFile para db
+    if (!db.is_open()) {
         cerr << "Erro ao abrir arquivo de dados: " << dbPath << endl;
         return 1;
     }
@@ -43,9 +43,9 @@ int main(int argc, char* argv[]) {
 
     // Preenche array<char,300> com a chave
     Chave chave{};
-    memset(chave.data(), 0, chave.size()); // Zera todo o array
-    strncpy(chave.data(), chaveStr.c_str(), chave.size() - 1);
-    chave[chave.size() - 1] = '\0'; // Garante terminação
+    memset(chave.data(), 0, sizeof(Chave));
+    strncpy(chave.data(), chaveStr.c_str(), sizeof(Chave));
+    chave.data()[sizeof(Chave)-1] = '\0'; // Garante terminação
 
     // Busca o registro no arquivo de dados
     cout << "\nRecuperando registro do arquivo de dados..." << endl;
@@ -72,8 +72,7 @@ int main(int argc, char* argv[]) {
     cout << "\nEstatisticas da busca em dados:" << endl;
     cout << "Blocos lidos nos dados: " << res.second << endl;
     cout << "Tempo de busca nos dados: " << tempoBuscaDados << " ms" << endl;
-    cout << "Total de blocos no arquivo: " << bptree.contarBlocos() << endl;
-
+    cout << "Total de blocos: " << bptree.contarBlocos() << "\n";
 
     return 0;
 }

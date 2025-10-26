@@ -179,10 +179,10 @@ struct KeyOps {
 template<size_t N>
 struct KeyOps<array<char, N>> {
     static bool less(const array<char, N>& a, const array<char, N>& b){
-        return strcmp(a.data(), b.data()) < 0;
+        return strncmp(a.data(), b.data(), N) < 0;
     }
     static bool equal(const array<char, N>& a, const array<char, N>& b){
-        return strcmp(a.data(), b.data()) == 0;
+        return strncmp(a.data(), b.data(), N) == 0;
     }
     static void copy(array<char, N>& dest, const array<char, N>& src) {
         memset(dest.data(), 0, N);
@@ -207,56 +207,59 @@ auto comp() {
 }
 
 // Insere par chave/ponteiro em um nó
-template<typename key, int M>
-void inserirCP(fstream *file, no<key, M> *noAtual, key chave, ptr ponteiro, ptr pAtual, PageCache<key,M>* cache){
+template <typename key, int M>
+void inserirCP(fstream *file, no<key, M> *noAtual, key chave, ptr ponteiro, ptr pAtual, PageCache<key, M> *cache)
+{
     key *chaves = noAtual->keys;
     ptr *ponteiros = noAtual->ponteiros;
 
     int i = noAtual->qtdKeys - 1;
 
-    if(noAtual->folha){
+    if (noAtual->folha){
         // Encontra posição de inserção
-        while(i >= 0 && KeyOps<key>::less(chave, chaves[i])) i--;
-
+        while (i >= 0 && KeyOps<key>::less(chave, chaves[i]))
+            i--;
         int pos = i + 1;
-        // Move todos os elementos à direita de pos uma casa para a direita
-        if (noAtual->qtdKeys - pos > 0) {
-            memmove(&chaves[pos+1], &chaves[pos], sizeof(key)*(noAtual->qtdKeys - pos));
-            memmove(&ponteiros[pos+1], &ponteiros[pos], sizeof(ptr)*(noAtual->qtdKeys - pos));
+
+        // Move todas as chaves e ponteiros à direita de pos uma casa para a direita
+        for (int j = noAtual->qtdKeys - 1; j >= pos; --j){
+            KeyOps<key>::copy(chaves[j + 1], chaves[j]);
+            ponteiros[j + 1] = ponteiros[j];
         }
-        // Insere
+
+        // Insere nova chave e ponteiro
         KeyOps<key>::copy(chaves[pos], chave);
         ponteiros[pos] = ponteiro;
     }
-    else {
+    else{
         // Nó interno: encontra posição para nova chave
-        while(i >= 0 && KeyOps<key>::less(chave, chaves[i])) i--;
+        while (i >= 0 && KeyOps<key>::less(chave, chaves[i])) i--;
         int pos = i + 1;
 
         // Move chaves à direita de pos
-        if (noAtual->qtdKeys - pos > 0) {
-            memmove(&chaves[pos+1], &chaves[pos], sizeof(key)*(noAtual->qtdKeys - pos));
-        }
-        // Move ponteiros: há qtdKeys+1 ponteiros; precisamos mover ponteiros[pos+1 .. qtdKeys] para pos+2 .. 
-        if (noAtual->qtdKeys - pos + 1 > 0) { // number of pointers to move
-            memmove(&ponteiros[pos+2], &ponteiros[pos+1], sizeof(ptr)*(noAtual->qtdKeys - pos + 1));
+        for (int j = noAtual->qtdKeys - 1; j >= pos; --j){
+            KeyOps<key>::copy(chaves[j + 1], chaves[j]);
         }
 
-        // Insere chave e novo ponteiro à direita dela
+        // Move ponteiros à direita de pos+1
+        for (int j = noAtual->qtdKeys; j >= pos + 1; --j){
+            ponteiros[j + 1] = ponteiros[j];
+        }
+
+        // Insere chave e ponteiro à direita
         KeyOps<key>::copy(chaves[pos], chave);
-        ponteiros[pos+1] = ponteiro;
+        ponteiros[pos + 1] = ponteiro;
     }
 
     noAtual->qtdKeys++;
     reescrever(file, pAtual, noAtual, cache);
 }
 
+
 // Divide nó cheio em dois e promove uma chave
 template<typename key, int M>
 pair<key, ptr> cisao(fstream *file, ptr pAtual, no<key, M> *noAtual, no<key, M> *noNovo, key chave, ptr ponteiro, PageCache<key,M>* cache) {
-    // -----------------------------
-    // 1️⃣ Inserir temporariamente chave no nó atual (somente para decidir cisão)
-    // -----------------------------
+
     key tempKeys[M+1];
     ptr tempPtrs[M+2];
 
@@ -270,7 +273,7 @@ pair<key, ptr> cisao(fstream *file, ptr pAtual, no<key, M> *noAtual, no<key, M> 
     // Encontra posição de inserção
     int i = tam-1;
     while (i>=0 && KeyOps<key>::less(chave, tempKeys[i])) {
-        tempKeys[i+1] = tempKeys[i];
+        KeyOps<key>::copy(tempKeys[i+1], tempKeys[i]);
         tempPtrs[i+2] = tempPtrs[i+1];
         i--;
     }
@@ -279,14 +282,8 @@ pair<key, ptr> cisao(fstream *file, ptr pAtual, no<key, M> *noAtual, no<key, M> 
     tempPtrs[pos+1] = ponteiro;
     tam++;
 
-    // -----------------------------
-    // 2️⃣ Determinar meio
-    // -----------------------------
     int meio = tam / 2;
 
-    // -----------------------------
-    // 3️⃣ Separar nós folha vs interno
-    // -----------------------------
     noNovo->folha = noAtual->folha;
     noNovo->qtdKeys = 0;
     for (int j=0;j<M+2;j++) noNovo->ponteiros[j] = static_cast<ptr>(-1);
@@ -394,7 +391,7 @@ struct bp{
         auto fileSize = f->tellg();
         if (fileSize == 0) {
             // escreve header placeholder com zeros para reservar espaço
-            std::vector<char> header(BPTREE_HEADER_SIZE, 0);
+            vector<char> header(BPTREE_HEADER_SIZE, 0);
             f->seekp(0, ios::beg);
             f->write(header.data(), header.size());
             f->flush();
@@ -423,7 +420,6 @@ struct bp{
         file->flush();
     }
 
-    // Carrega metadados
     void carregarArvore(fstream* f){
         this->file = f;
         this->cache = make_unique<PageCache<key,M>>(f);
@@ -432,7 +428,7 @@ struct bp{
         f->clear();
         f->seekg(0, ios::end);
         auto fileSize = f->tellg();
-        if (fileSize < static_cast<std::streamoff>(BPTREE_HEADER_SIZE)) {
+        if (fileSize < static_cast<streamoff>(BPTREE_HEADER_SIZE)) {
             // Arquivo não tem header válido — tratar como árvore vazia
             this->raiz = static_cast<ptr>(-1);
             this->primeiraFolha = static_cast<ptr>(-1);
@@ -514,7 +510,9 @@ struct bp{
 
         pair<key, ptr> promovida = cisao(file, pAtual, &noAtual, &novoNo, chave, ponteiro, cache.get());
         this->qtd_nos += 1;
-        chave = promovida.first; ponteiro = promovida.second;
+        
+        KeyOps<key>::copy(chave, promovida.first);
+        ponteiro = promovida.second;
 
         // "Sobe" na árvore até encontrar espaço (tira da pilha)
         while(!pilha.empty()){
@@ -534,7 +532,8 @@ struct bp{
 
             promovida = cisao(file, pAtual, &noAtual, &novoNo2, chave, ponteiro, cache.get());
             this->qtd_nos += 1;
-            chave = promovida.first; ponteiro = promovida.second;
+            KeyOps<key>::copy(chave, promovida.first);
+            ponteiro = promovida.second;
 
             // Se chegou na raíz, para
             if(pilha.empty()) break; 
@@ -557,36 +556,4 @@ struct bp{
     ~bp() {
         if (cache) cache->flush();
     }
-
-    void mostrarArvore(ptr noAtual, int nivel) {
-        if (noAtual == static_cast<ptr>(-1)) return;
-
-        no<key, M> no;
-        carregar(file, noAtual, &no, cache.get());
-
-        if (nivel == 0) cout << "Quantidade de nós: " << this->qtd_nos << "\n";
-        
-        // Imprime indentação conforme o nível
-        for (int i=0; i<nivel; i++) cout << "  ";
-        
-        // Imprime o nó
-        cout << "No " << static_cast<long long>(noAtual) << " (nivel " << nivel << ", " 
-            << (no.folha ? "folha" : "interno") << "): ";
-        
-        for (int i=0;i<no.qtdKeys;i++) {
-            // Usar KeyOps::print para tipos especiais
-            printKey(no.keys[i]);
-            if (i < no.qtdKeys - 1) cout << ", ";
-        }
-        cout << endl;
-        
-        // Se não é folha, mostra os filhos recursivamente
-        if (!no.folha) {
-            for (int i=0;i<=no.qtdKeys;i++) {
-                mostrarArvore(no.ponteiros[i], nivel + 1);
-            }
-        }
-    }
 };
-
-

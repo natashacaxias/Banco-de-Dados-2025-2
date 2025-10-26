@@ -43,14 +43,14 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
     indices.reserve(regs.size());
     if (regs.empty()) return indices;
 
-    // Agrupar registros por bucket (sem alterar a ordem global)
+    // 1️⃣ Agrupar registros por bucket (sem alterar a ordem global)
     vector<vector<pair<int, Registro>>> buckets(numBuckets);
     for (size_t i = 0; i < regs.size(); ++i) {
         int b = hashFunction(regs[i].id);
         buckets[b].push_back({static_cast<int>(i), regs[i]}); // guarda o índice original
     }
 
-    // Abrir arquivo de dados
+    // 2️⃣ Abrir arquivo de dados
     fstream file(filePath, ios::in | ios::out | ios::binary);
     if (!file.is_open()) {
         cerr << "Erro ao abrir arquivo de dados: " << filePath << endl;
@@ -60,7 +60,7 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
     const int64_t tamRegistro = sizeof(Registro);
     unordered_map<int, int64_t> idToPos; // id → posição real
 
-    // Inserir bucket por bucket
+    // 3️⃣ Inserir bucket por bucket
     for (int b = 0; b < numBuckets; b++) {
         if (buckets[b].empty()) continue;
 
@@ -104,7 +104,7 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
             }
         }
 
-        // Escrever registros deste bucket
+        // 4️⃣ Escrever registros deste bucket
         for (auto [origIndex, rcopy] : buckets[b]) {
             int64_t pos = 0;
             if (registrosOcupados < bucketSize) {
@@ -145,7 +145,7 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
 
     file.flush();
 
-    // Monta vetor de retorno na mesma ordem do vetor original
+    // 5️⃣ Monta vetor de retorno na mesma ordem do vetor original
     indices.reserve(regs.size());
     for (const auto& r : regs) {
         loteReturn lr{};

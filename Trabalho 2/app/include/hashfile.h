@@ -8,6 +8,10 @@
 #include "common.h"
 using namespace std;
 
+// =====================
+// Estruturas
+// =====================
+
 struct loteReturn{
     int64_t pos;
     array<char,300> titulo;
@@ -24,6 +28,9 @@ struct RegistroCSV {
     string snippet;
 };
 
+// =====================
+// Classe principal
+// =====================
 class HashFile {
 private:
     string filePath;   // caminho do arquivo físico

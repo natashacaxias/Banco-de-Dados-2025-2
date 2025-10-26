@@ -138,7 +138,7 @@ int main(int argc, char* argv[]) {
     // Pula header
     getline(arquivo, linha);
 
-    cout << "Iniciando leitura e inserção..." << endl;
+    cout << "Iniciando leitura e insercao..." << endl;
 
     while (getline(arquivo, linha)) {
         if (linha.empty()) continue;
@@ -160,9 +160,9 @@ int main(int argc, char* argv[]) {
                 if (lr.pos != static_cast<int64_t>(-1)) {
                     bptreeId.inserir(lr.id, lr.pos);
                     array<char,300> tituloArray{};
-                    memset(tituloArray.data(), 0, 300);
-                    strncpy(tituloArray.data(), lr.titulo.data(), 299);
-                    tituloArray[299] = '\0';
+                    memset(tituloArray.data(), 0, sizeof(array<char,300>));
+                    strncpy(tituloArray.data(), lr.titulo.data(), sizeof(array<char,300>)-1);
+                    tituloArray[sizeof(array<char,300>)-1] = '\0'; // Garante terminação
                     bptreeTitulo.inserir(tituloArray, lr.pos);
                 }
             }
@@ -177,9 +177,9 @@ int main(int argc, char* argv[]) {
             double percent = (100.0 * inseridos) / totalLinhas;
             double speed = inseridos / elapsed;
             cout << fixed << setprecision(1);
-            cout << "⏱" << setw(7) << elapsed << "s | "
+            cout << "Tempo" << setw(7) << elapsed << "s | "
                  << setw(8) << inseridos << "/" << totalLinhas
-                 << " (" << percent << "%) — "
+                 << " (" << percent << "%) - "
                  << (int)speed << " regs/s\n" << flush;
         }
     }
@@ -191,9 +191,9 @@ int main(int argc, char* argv[]) {
             if (lr.pos != static_cast<int64_t>(-1)) {
                 bptreeId.inserir(lr.id, lr.pos);
                 array<char,300> tituloArray{};
-                memset(tituloArray.data(), 0, 300);            
-                strncpy(tituloArray.data(), lr.titulo.data(), 299);
-                tituloArray[299] = '\0';
+                memset(tituloArray.data(), 0, sizeof(array<char,300>));
+                strncpy(tituloArray.data(), lr.titulo.data(), sizeof(array<char,300>)-1);
+                tituloArray[sizeof(array<char,300>)-1] = '\0'; // Garante terminação
                 bptreeTitulo.inserir(tituloArray, lr.pos);
             }
         }

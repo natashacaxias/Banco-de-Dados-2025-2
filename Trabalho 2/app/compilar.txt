@@ -2,11 +2,15 @@ g++ src/upload.cpp src/hashfile.cpp -o bin/upload
 bin/upload.exe .\data\artigo_corrigido.csv 
 
 g++ src/findrec.cpp src/hashfile.cpp -o bin/findrec
-bin/findrec 50
+bin/findrec 450
 
 g++ src/seek1.cpp src/hashfile.cpp -o bin/seek1
-bin/seek1 50
+bin/seek1 450
 
 g++ src/seek2.cpp src/hashfile.cpp -o bin/seek2
-bin/seek2 ""
+bin/seek2 "A Public Cloud Storage Auditing Scheme with Lightweight Authenticator Generation."
 
+outros que dão certo:
+
+Extracting Compact Sets of Features for Question Classification in Cognitive Systems: A Comparative Study.
+Extensional Schemes of Multipartite Non-interactive Key Exchange from Multilinear Maps.
