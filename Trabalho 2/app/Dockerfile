@@ -1,27 +1,45 @@
-# imagem base leve (Debian 12)
+# ===========================================================
+#  Dockerfile – TP2 Banco de Dados 1 (HashFile + Árvore B+)
+# ===========================================================
+
 FROM debian:bookworm-slim
 
-# instala compilador C++, ferramentas e Python com pandas
+# ------------------------------------------
+# 1. Instala compiladores e Python
+# ------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    g++ make cmake python3 python3-pip python3-pandas \
+    g++ make cmake python3 python3-pip gzip \
     && rm -rf /var/lib/apt/lists/*
 
-# define diretório principal da aplicação
 WORKDIR /app
-
-# copia todo o conteúdo do projeto para dentro do container
 COPY . /app
 
-# compila o projeto (usa o Makefile)
-RUN make build
+# ------------------------------------------
+# 2. Compila binários principais e utilitários
+# ------------------------------------------
+RUN make build && make build-utils
 
-# define volume onde ficam os dados (compartilhado com o host)
+# ------------------------------------------
+# 3. Define volume compartilhado
+# ------------------------------------------
 VOLUME ["/data"]
 
-# define variáveis de ambiente úteis
-ENV CSV_PATH=/data/input.csv \
-    DATA_DIR=/data/db \
+# ------------------------------------------
+# 4. Variáveis de ambiente padrão
+# ------------------------------------------
+ENV CSV_PATH=/data/artigo.csv.gz \
+    CSV_CORRIGIDO=/data/artigo_corrigido.csv \
+    DATA_DIR=/data \
     LOG_LEVEL=info
 
-# comando padrão exibindo instrução de uso
-CMD ["bash", "-lc", "echo 'Use: docker run --rm -v $(pwd)/data:/data tp2 ./bin/upload /data/input.csv'"]
+# ------------------------------------------
+# 5. Comando padrão: corrige o CSV e faz upload
+# ------------------------------------------
+ENTRYPOINT ["bash", "-lc"]
+CMD ["python3 utils/corrigir_csv_artigo.py && ./bin/upload /data/artigo_corrigido.csv"]
+
+# ===========================================================
+# Exemplo de uso:
+# docker build -t tp2 .
+# docker run --rm -v $(pwd)/data:/data -e LOG_LEVEL=debug tp2
+# ===========================================================
