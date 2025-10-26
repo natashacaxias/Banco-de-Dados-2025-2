@@ -1,45 +1,34 @@
-# ===========================================================
-#  Dockerfile – TP2 Banco de Dados 1 (HashFile + Árvore B+)
-# ===========================================================
 
+# imagem base recomendada
 FROM debian:bookworm-slim
 
-# ------------------------------------------
-# 1. Instala compiladores e Python
-# ------------------------------------------
+# instala apenas o necessário para compilação
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    g++ make cmake python3 python3-pip gzip \
-    && rm -rf /var/lib/apt/lists/*
+      g++ make cmake && \
+    rm -rf /var/lib/apt/lists/*
 
+# diretório de trabalho dentro do container
 WORKDIR /app
+
+# copia todos os arquivos do projeto
 COPY . /app
 
-# ------------------------------------------
-# 2. Compila binários principais e utilitários
-# ------------------------------------------
-RUN make build && make build-utils
+# compila usando o Makefile padrão
+RUN make build
 
-# ------------------------------------------
-# 3. Define volume compartilhado
-# ------------------------------------------
+# diretório para dados persistentes (montado em runtime)
 VOLUME ["/data"]
 
-# ------------------------------------------
-# 4. Variáveis de ambiente padrão
-# ------------------------------------------
-ENV CSV_PATH=/data/artigo.csv.gz \
+# variáveis de ambiente para facilitar testes
+# CSV_GZ          = arquivo original compactado
+# CSV_CORRIGIDO   = arquivo limpo gerado pelo script corrigir_csv_artigo.py
+# DATA_DIR        = onde ficam data.db e os índices .idx
+# LOG_LEVEL       = nível de log desejado (error|warn|info|debug)
+ENV CSV_GZ=/data/artigo.csv.gz \
     CSV_CORRIGIDO=/data/artigo_corrigido.csv \
     DATA_DIR=/data \
     LOG_LEVEL=info
 
-# ------------------------------------------
-# 5. Comando padrão: corrige o CSV e faz upload
-# ------------------------------------------
-ENTRYPOINT ["bash", "-lc"]
-CMD ["python3 utils/corrigir_csv_artigo.py && ./bin/upload /data/artigo_corrigido.csv"]
-
-# ===========================================================
-# Exemplo de uso:
-# docker build -t tp2 .
-# docker run --rm -v $(pwd)/data:/data -e LOG_LEVEL=debug tp2
-# ===========================================================
+# comando padrão (orientativo)
+# conforme a especificação mínima, apenas exibe instruções
+CMD ["bash", "-lc", "echo 'Passo 1: python3 utils/corrigir_csv_artigo.py   # gera /data/artigo_corrigido.csv a partir de /data/artigo.csv.gz'; echo 'Passo 2: ./bin/upload /data/artigo_corrigido.csv   # cria data.db e índices B+'; echo ''; echo 'Busca direta no hash:      ./bin/findrec <ID>'; echo 'Busca no índice primário:  ./bin/seek1 <ID>'; echo 'Busca no índice secundário ./bin/seek2 \"<TITULO>\"'; echo ''; echo 'Binários disponíveis:'; ls -l bin/"]
