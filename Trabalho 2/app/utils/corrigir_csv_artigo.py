@@ -3,6 +3,7 @@ import re
 import gzip
 import os
 
+# define diretórios e caminhos dos arquivos
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "..", "data")
 
@@ -11,6 +12,7 @@ ARQUIVO_SAIDA = os.path.join(DATA_DIR, "artigo_corrigido.csv")
 ARQUIVO_LOG = os.path.join(DATA_DIR, "erros_csv.log")
 
 
+# abre o arquivo CSV normal ou .gz (compactado)
 def abrir_arquivo(entrada):
     """Abre o arquivo normalmente ou descompacta se for .gz"""
     if entrada.endswith(".gz"):
@@ -18,6 +20,7 @@ def abrir_arquivo(entrada):
     return open(entrada, "r", encoding="utf-8", errors="replace")
 
 
+# função principal que limpa e corrige o CSV
 def corrigir_csv(entrada, saida, log, num_campos=7):
     with abrir_arquivo(entrada) as f_in, \
          open(saida, "w", encoding="utf-8", newline="\n") as f_out, \
@@ -26,27 +29,29 @@ def corrigir_csv(entrada, saida, log, num_campos=7):
         total = 0
         erros = 0
 
-        # Normaliza CRLF → LF durante a leitura
+        # normaliza finais de linha (CRLF → LF)
         linhas_normalizadas = (linha.replace("\r\n", "\n").replace("\r", "\n") for linha in f_in)
         leitor = csv.reader(linhas_normalizadas, delimiter=";", quotechar='"')
 
         for linha in leitor:
             total += 1
 
-            # Remove aspas extras
+            # remove aspas desnecessárias
             linha = [campo.strip('"') for campo in linha]
 
-            # Corrige linhas incompletas
+            # corrige linhas quebradas ou com número errado de campos
             if len(linha) != num_campos:
                 texto = ";".join(linha)
                 texto = re.sub(r"\s+", " ", texto)
                 partes = texto.split(";")
 
+                # ajusta quantidade de campos
                 if len(partes) > num_campos:
                     partes = partes[:num_campos]
                 elif len(partes) < num_campos:
                     partes += [""] * (num_campos - len(partes))
 
+                # se ainda estiver incorreto, registra no log
                 if len(partes) != num_campos:
                     erros += 1
                     f_log.write(f"Linha {total} com erro: {linha}\n")
@@ -54,9 +59,10 @@ def corrigir_csv(entrada, saida, log, num_campos=7):
 
                 linha = partes
 
-            # Grava linha manualmente em formato Unix (LF)
+            # grava linha corrigida
             f_out.write(";".join(linha) + "\n")
 
+        # resumo no terminal
         print(f"✅ Corrigido! Linhas processadas: {total}")
         print(f"🧹 Linhas recuperadas/corrigidas: {total - erros}")
         print(f"⚠️ Linhas ainda problemáticas: {erros}")
@@ -64,5 +70,6 @@ def corrigir_csv(entrada, saida, log, num_campos=7):
         print(f"📜 Log de erros: {log}")
 
 
+# executa se rodar direto pelo terminal
 if __name__ == "__main__":
     corrigir_csv(ARQUIVO_ENTRADA, ARQUIVO_SAIDA, ARQUIVO_LOG)
