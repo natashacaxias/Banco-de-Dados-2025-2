@@ -63,11 +63,11 @@ def corrigir_csv(entrada, saida, log, num_campos=7):
             f_out.write(";".join(linha) + "\n")
 
         # resumo no terminal
-        print(f"✅ Corrigido! Linhas processadas: {total}")
-        print(f"🧹 Linhas recuperadas/corrigidas: {total - erros}")
-        print(f"⚠️ Linhas ainda problemáticas: {erros}")
-        print(f"📁 Arquivo corrigido salvo em: {saida}")
-        print(f"📜 Log de erros: {log}")
+        print(f" Corrigido! Linhas processadas: {total}")
+        print(f" Linhas recuperadas/corrigidas: {total - erros}")
+        print(f" Linhas ainda problemáticas: {erros}")
+        print(f" Arquivo corrigido salvo em: {saida}")
+        print(f" Log de erros: {log}")
 
 
 # executa se rodar direto pelo terminal

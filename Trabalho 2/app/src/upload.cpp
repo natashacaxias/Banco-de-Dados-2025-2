@@ -1,15 +1,35 @@
+// ============================================================
+// upload.cpp
+// ------------------------------------------------------------
+// Programa responsável por realizar a carga inicial dos dados
+// (upload) a partir de um arquivo CSV. 
+//
+// Ele cria:
+//   • O arquivo de dados principal organizado por hashing;
+//   • O índice primário (B+Tree por ID);
+//   • O índice secundário (B+Tree por Título).
+//
+// O programa lê o CSV linha a linha, converte os registros
+// para formato fixo e insere em disco, atualizando também
+// os índices em memória secundária.
+// ============================================================
+
 #include <bits/stdc++.h>
 #include <cstring>
 #include "../include/hashfile.h"
 #include "../include/bptreefile.h"
 #include "../include/common.h"
-
 using namespace std;
 
-// converte RegistroCSV em Registro fixo (para gravar no disco)
+// ============================================================
+// Função auxiliar: Converte RegistroCSV → Registro fixo
+// ------------------------------------------------------------
+// Transforma os campos variáveis lidos do CSV em um registro
+// de tamanho fixo, adequado para gravação binária em disco.
+// ============================================================
 Registro toRegistro(const RegistroCSV& csv) {
     Registro r;
-    memset(&r, 0, sizeof(Registro)); // zera toda a estrutura
+    memset(&r, 0, sizeof(Registro)); // zera a estrutura inteira
 
     r.id = csv.id;
     strncpy(r.titulo.data(), csv.titulo.c_str(), sizeof(r.titulo) - 1);
@@ -18,12 +38,18 @@ Registro toRegistro(const RegistroCSV& csv) {
     strncpy(r.citacoes, csv.citacoes.c_str(), sizeof(r.citacoes) - 1);
     strncpy(r.data_atualizacao, csv.data_atualizacao.c_str(), sizeof(r.data_atualizacao) - 1);
     strncpy(r.snippet, csv.snippet.c_str(), sizeof(r.snippet) - 1);
+    r.prox = -1; // inicializa o encadeamento
 
-    r.prox = -1;
     return r;
 }
 
-// lê uma linha CSV e separa os campos por ';'
+// ============================================================
+// Função auxiliar: parseCSV()
+// ------------------------------------------------------------
+// Lê uma linha do arquivo CSV, remove caracteres indesejados
+// (aspas, BOM UTF-8, CRLF) e separa os campos pelo delimitador
+// ';'. Retorna um RegistroCSV populado com os valores.
+// ============================================================
 RegistroCSV parseCSV(const string &linhaOriginal) {
     RegistroCSV reg{};
     if (linhaOriginal.empty()) {
@@ -33,18 +59,18 @@ RegistroCSV parseCSV(const string &linhaOriginal) {
 
     string linha = linhaOriginal;
 
-    // remove BOM UTF-8 (caso venha de Windows)
-    if (linha.size() >= 3 && 
-        (unsigned char)linha[0] == 0xEF && 
-        (unsigned char)linha[1] == 0xBB && 
+    // Remove BOM UTF-8 (arquivos exportados do Windows)
+    if (linha.size() >= 3 &&
+        (unsigned char)linha[0] == 0xEF &&
+        (unsigned char)linha[1] == 0xBB &&
         (unsigned char)linha[2] == 0xBF) {
         linha.erase(0, 3);
     }
 
-    // remove \r do final (arquivos CRLF)
+    // Remove \r no final (caso CRLF)
     if (!linha.empty() && linha.back() == '\r') linha.pop_back();
 
-    // separa os campos
+    // Divide a linha pelos ';'
     stringstream ss(linha);
     string campo;
     vector<string> campos;
@@ -54,13 +80,13 @@ RegistroCSV parseCSV(const string &linhaOriginal) {
         campos.push_back(campo);
     }
 
-    // verifica se há campos suficientes
+    // Verifica quantidade mínima de campos
     if (campos.size() < 7) {
         reg.id = 0;
         return reg;
     }
 
-    // tenta converter o ID
+    // Converte o ID para inteiro
     try {
         reg.id = stoi(campos[0]);
     } catch (...) {
@@ -68,7 +94,7 @@ RegistroCSV parseCSV(const string &linhaOriginal) {
         return reg;
     }
 
-    // substitui campos vazios por valores padrão
+    // Preenche campos vazios com valores padrão
     reg.titulo           = campos[1].empty() ? "Sem Titulo"      : campos[1];
     reg.ano              = campos[2].empty() ? "0000"            : campos[2];
     reg.autores          = campos[3].empty() ? "Sem Autores"     : campos[3];
@@ -79,6 +105,15 @@ RegistroCSV parseCSV(const string &linhaOriginal) {
     return reg;
 }
 
+// ============================================================
+// Função principal
+// ------------------------------------------------------------
+// Espera como argumento na linha de comando:
+//   ./bin/upload <arquivo.csv>
+//
+// Exemplo de execução dentro do container:
+//   docker run --rm -v $(pwd)/data:/data tp2 ./bin/upload /data/artigo.csv
+// ============================================================
 int main(int argc, char* argv[]) {
     auto inicioTotal = chrono::high_resolution_clock::now();
 
@@ -86,7 +121,9 @@ int main(int argc, char* argv[]) {
     cin.tie(nullptr);
     cout.setf(std::ios::unitbuf);
 
-    // verifica argumento do CSV
+    // --------------------------------------------------------
+    // Validação dos argumentos
+    // --------------------------------------------------------
     if (argc < 2) {
         cerr << "Uso: ./bin/upload <arquivo.csv>\n";
         return 1;
@@ -99,26 +136,31 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    cout << "Iniciando upload interativo do arquivo: " << caminhoCSV << "\n";
+    cout << "Iniciando upload do arquivo: " << caminhoCSV << "\n";
     cout << "--------------------------------------------------------\n";
 
-    // cria o arquivo principal (hash)
+    // ========================================================
+    // Etapa 1: Criação do arquivo de dados principal (hash)
+    // ========================================================
     HashFile hashFile("/data/data.db", NUM_BUCKETS, BUCKET_SIZE);
     hashFile.criarArquivoVazio();
 
-    // cria os arquivos de índice (B+ por ID e por Título)
+    // ========================================================
+    // Etapa 2: Criação dos arquivos de índice B+
+    // ========================================================
     using idKey = int;
-    using tituloKey = array<char,300>; 
-    system("mkdir -p /data");
-    
+    using tituloKey = array<char,300>;
+    system("mkdir -p /data"); // garante existência da pasta
+
     fstream bptFileId("/data/bptreeId.idx", ios::in | ios::out | ios::binary | ios::trunc);
     if (!bptFileId.is_open()) {
-        cerr << "Erro ao criar arquivo de índice B+: /data/bptreeId.idx\n";
+        cerr << "Erro ao criar arquivo de índice primário: /data/bptreeId.idx\n";
         return 1;
     }
+
     fstream bptFileTitulo("/data/bptreeTitulo.idx", ios::in | ios::out | ios::binary | ios::trunc);
     if (!bptFileTitulo.is_open()) {
-        cerr << "Erro ao criar arquivo de índice B+: /data/bptreeTitulo.idx\n";
+        cerr << "Erro ao criar arquivo de índice secundário: /data/bptreeTitulo.idx\n";
         return 1;
     }
 
@@ -127,12 +169,15 @@ int main(int argc, char* argv[]) {
     bptreeId.iniciar(&bptFileId);
     bptreeTitulo.iniciar(&bptFileTitulo);
 
+    // ========================================================
+    // Etapa 3: Leitura e inserção dos registros
+    // ========================================================
     vector<Registro> buffer;
     buffer.reserve(BATCH_SIZE);
 
     long totalLinhas = 0, inseridos = 0, invalidos = 0;
 
-    // conta linhas do arquivo
+    // Conta o número de linhas válidas no CSV
     {
         ifstream temp(caminhoCSV);
         string linhaTemp;
@@ -144,56 +189,57 @@ int main(int argc, char* argv[]) {
 
     auto start = chrono::high_resolution_clock::now();
     string linha;
+    cout << "Iniciando leitura e inserção...\n";
 
-    cout << "Iniciando leitura e insercao..." << endl;
-
-    // leitura linha a linha do CSV
+    // --------------------------------------------------------
+    // Leitura linha a linha e processamento em lotes
+    // --------------------------------------------------------
     while (getline(arquivo, linha)) {
         if (linha.empty()) continue;
 
         RegistroCSV csv = parseCSV(linha);
-        if (csv.id == 0) { 
-            invalidos++; 
-            continue; 
-        }
+        if (csv.id == 0) { invalidos++; continue; }
 
         buffer.push_back(toRegistro(csv));
         inseridos++;
 
-        // processa o buffer em lotes
+        // Quando o buffer atinge o tamanho definido, grava o lote
         if (buffer.size() >= BATCH_SIZE) {
             vector<loteReturn> indices = hashFile.inserirEmLote(buffer);
 
-            // insere cada item nos índices B+
-            for (loteReturn lr : indices) {
+            // Atualiza índices B+ (primário e secundário)
+            for (const loteReturn &lr : indices) {
                 if (lr.pos != static_cast<int64_t>(-1)) {
-                    bptreeId.inserir(lr.id, lr.pos);;
+                    bptreeId.inserir(lr.id, lr.pos);
                     bptreeTitulo.inserir(lr.titulo, lr.pos);
                 }
             }
+
             bptreeId.salvarMetadados();
             bptreeTitulo.salvarMetadados();
             buffer.clear();
         }
 
-        // exibe progresso
+        // Exibe progresso periodicamente
         if (inseridos % PROGRESS_STEP == 0) {
             auto now = chrono::high_resolution_clock::now();
             double elapsed = chrono::duration<double>(now - start).count();
             double percent = (100.0 * inseridos) / totalLinhas;
             double speed = inseridos / elapsed;
             cout << fixed << setprecision(1);
-            cout << "Tempo" << setw(7) << elapsed << "s | "
+            cout << "Tempo: " << setw(7) << elapsed << "s | "
                  << setw(8) << inseridos << "/" << totalLinhas
                  << " (" << percent << "%) - "
-                 << (int)speed << " regs/s\n" << flush;
+                 << (int)speed << " regs/s\n";
         }
     }
 
-    // processa o último lote
+    // ========================================================
+    // Etapa 4: Processamento do último lote
+    // ========================================================
     if (!buffer.empty()) {
         vector<loteReturn> indices = hashFile.inserirEmLote(buffer);
-        for (loteReturn lr : indices) {
+        for (const loteReturn &lr : indices) {
             if (lr.pos != static_cast<int64_t>(-1)) {
                 bptreeId.inserir(lr.id, lr.pos);
                 bptreeTitulo.inserir(lr.titulo, lr.pos);
@@ -201,7 +247,9 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // grava tudo no disco
+    // ========================================================
+    // Etapa 5: Finalização e salvamento em disco
+    // ========================================================
     bptreeId.flushCache(); 
     bptreeTitulo.flushCache();
     bptFileId.flush(); 
@@ -212,27 +260,29 @@ int main(int argc, char* argv[]) {
     auto end = chrono::high_resolution_clock::now();
     double totalTime = chrono::duration<double>(end - start).count();
 
-    // resumo final
-    cout << "\nUpload concluido!\n";
-    cout << "Registros validos: " << inseridos
-         << " | Invalidos: " << invalidos << "\n";
+    // ========================================================
+    // Etapa 6: Relatório final da execução
+    // ========================================================
+    cout << "\nUpload concluído!\n";
+    cout << "Registros válidos: " << inseridos
+         << " | Inválidos: " << invalidos << "\n";
     cout << "Tempo total: " << fixed << setprecision(2)
          << totalTime << " s\n";
     if (totalTime > 0)
-        cout << "Velocidade media: " << (int)(inseridos / totalTime)
+        cout << "Velocidade média: " << (int)(inseridos / totalTime)
              << " regs/s\n";
 
     cout << "Total de blocos no arquivo: "
          << hashFile.getTotalBlocos() << endl;
 
-    cout << "Indices B+ salvos em: /data/bptreeId.idx e /data/bptreeTitulo.idx\n";
+    cout << "Índices B+ salvos em: /data/bptreeId.idx e /data/bptreeTitulo.idx\n";
     cout << "--------------------------------------------------------\n";
     cout << "Arquivo principal salvo em: /data/data.db\n";
 
     auto fimTotal = chrono::high_resolution_clock::now();
     double tempoTotal = chrono::duration<double, milli>(fimTotal - inicioTotal).count();
 
-    cout << "Tempo total de execucao: " << tempoTotal << " ms" << endl;
-    
+    cout << "Tempo total de execução: " << tempoTotal << " ms\n";
+
     return 0;
 }

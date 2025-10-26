@@ -1,21 +1,49 @@
+// ============================================================
+// hashfile.cpp
+// ------------------------------------------------------------
+// Implementação das funções da classe HashFile, responsável
+// por gerenciar o arquivo de dados em disco organizado por
+// hashing. Esta estrutura oferece acesso direto aos registros
+// via função hash, com suporte a área de overflow encadeada.
+// ============================================================
+
 #include "../include/hashfile.h"
 #include <bits/stdc++.h>
 #include <unistd.h>
 #include <fcntl.h>
 using namespace std;
 
-// construtor: inicializa caminho e parâmetros
+// ============================================================
+// Construtor
+// ------------------------------------------------------------
+// Inicializa os parâmetros principais do arquivo hash:
+//  - path: caminho do arquivo de dados em disco
+//  - nb: número total de buckets
+//  - bs: tamanho (número de registros) de cada bucket
+// ============================================================
 HashFile::HashFile(string path, int nb, int bs)
     : filePath(std::move(path)), numBuckets(nb), bucketSize(bs) {}
 
-// retorna o tamanho atual do arquivo (em bytes)
+// ============================================================
+// fileSizeBytes()
+// ------------------------------------------------------------
+// Retorna o tamanho atual do arquivo de dados em bytes.
+// Caso o arquivo não exista ou não possa ser aberto,
+// retorna 0.
+// ============================================================
 int64_t HashFile::fileSizeBytes() const {
     ifstream f(filePath, ios::binary | ios::ate);
     if (!f.is_open()) return 0;
     return static_cast<int64_t>(f.tellg());
 }
 
-// cria o arquivo base de dados com registros vazios
+// ============================================================
+// criarArquivoVazio()
+// ------------------------------------------------------------
+// Cria um novo arquivo de dados vazio, inicializando todos
+// os buckets e registros com valores nulos. Cada registro
+// começa com id=0 e prox=-1 (sem encadeamento).
+// ============================================================
 void HashFile::criarArquivoVazio() {
     cout << filePath.c_str() << "\n\n";
 
@@ -37,7 +65,7 @@ void HashFile::criarArquivoVazio() {
     cout << fixed << setprecision(3)
          << "Tamanho estimado: " << tamanhoMB << " MB\n";
 
-    // grava todos os registros vazios
+    // Grava todos os registros vazios no arquivo
     for (int64_t i = 0; i < totalRegistros; ++i) {
         file.write(reinterpret_cast<const char*>(&vazio), sizeof(Registro));
     }
@@ -46,27 +74,48 @@ void HashFile::criarArquivoVazio() {
     cout << "✅ Arquivo de dados inicializado com sucesso." << endl;
 }
 
-// função hash simples (mod numBuckets)
+// ============================================================
+// hashFunction()
+// ------------------------------------------------------------
+// Calcula o índice (bucket) de um determinado ID. A função
+// de hashing usada é a divisão simples (módulo do número de
+// buckets). Retorna um valor entre [0, numBuckets-1].
+// ============================================================
 int HashFile::hashFunction(int key) const {
     int m = numBuckets > 0 ? numBuckets : 1;
     int h = key % m;
     return (h < 0 ? h + m : h);
 }
 
-// inserção em lote — otimiza escrita agrupando por bucket
+// ============================================================
+// inserirEmLote()
+// ------------------------------------------------------------
+// Realiza inserção em lote dos registros, agrupando-os por
+// bucket para reduzir operações de disco. Trata colisões
+// via encadeamento (overflow) no final do arquivo.
+// ------------------------------------------------------------
+// Retorna um vetor de estruturas `loteReturn` contendo:
+//  - id inserido
+//  - título do registro
+//  - posição (offset) no arquivo de dados
+// ============================================================
 vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
     vector<loteReturn> indices;
     indices.reserve(regs.size());
     if (regs.empty()) return indices;
 
-    // agrupa os registros conforme o bucket calculado
+    // --------------------------------------------------------
+    // Agrupamento por bucket
+    // --------------------------------------------------------
     vector<vector<pair<int, Registro>>> buckets(numBuckets);
     for (size_t i = 0; i < regs.size(); ++i) {
         int b = hashFunction(regs[i].id);
         buckets[b].push_back({static_cast<int>(i), regs[i]});
     }
 
-    // abre o arquivo para leitura e escrita
+    // --------------------------------------------------------
+    // Abertura do arquivo para leitura/escrita binária
+    // --------------------------------------------------------
     fstream file(filePath, ios::in | ios::out | ios::binary);
     if (!file.is_open()) {
         cerr << "Erro ao abrir arquivo de dados: " << filePath << endl;
@@ -74,9 +123,11 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
     }
 
     const int64_t tamRegistro = sizeof(Registro);
-    unordered_map<int, int64_t> idToPos; // id → posição real no arquivo
+    unordered_map<int, int64_t> idToPos; // mapeia id → offset real
 
-    // percorre cada bucket
+    // ========================================================
+    // Percorre cada bucket e insere registros
+    // ========================================================
     for (int b = 0; b < numBuckets; b++) {
         if (buckets[b].empty()) continue;
 
@@ -86,7 +137,9 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
         file.clear();
         file.seekg(base, ios::beg);
 
-        // procura a primeira posição livre no bucket
+        // ----------------------------------------------------
+        // 1. Procura a primeira posição livre no bucket
+        // ----------------------------------------------------
         for (int i = 0; i < bucketSize; ++i) {
             file.read(reinterpret_cast<char*>(&tmp), sizeof(Registro));
             if (!file) { file.clear(); break; }
@@ -97,7 +150,9 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
             registrosOcupados = i + 1;
         }
 
-        // verifica se precisa de overflow (encadeamento)
+        // ----------------------------------------------------
+        // 2. Verifica necessidade de overflow (encadeamento)
+        // ----------------------------------------------------
         int64_t lastChainPos = -1;
         if (registrosOcupados >= bucketSize) {
             int64_t lastPrimaryPos = base + (bucketSize - 1) * tamRegistro;
@@ -119,24 +174,26 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
             }
         }
 
-        // escreve os registros do bucket
+        // ----------------------------------------------------
+        // 3. Insere cada registro no bucket ou área de overflow
+        // ----------------------------------------------------
         for (auto [origIndex, rcopy] : buckets[b]) {
             int64_t pos = 0;
             if (registrosOcupados < bucketSize) {
-                // escreve na área primária
+                // Insere na área primária do bucket
                 pos = base + registrosOcupados * tamRegistro;
                 rcopy.prox = -1;
                 file.seekp(pos, ios::beg);
                 file.write(reinterpret_cast<const char*>(&rcopy), sizeof(Registro));
                 registrosOcupados++;
             } else {
-                // área de overflow (no final do arquivo)
+                // Caso de overflow: escreve no final do arquivo
                 file.seekp(0, ios::end);
                 pos = static_cast<int64_t>(file.tellp());
                 rcopy.prox = -1;
                 file.write(reinterpret_cast<const char*>(&rcopy), sizeof(Registro));
 
-                // atualiza o ponteiro do último nó da cadeia
+                // Atualiza o ponteiro de encadeamento
                 if (lastChainPos == -1) {
                     int64_t prevOffset = base + (bucketSize - 1) * tamRegistro;
                     file.seekg(prevOffset, ios::beg);
@@ -154,15 +211,17 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
                 lastChainPos = pos;
             }
 
-            // guarda posição do registro inserido
+            // Registra a posição real do registro
             idToPos[rcopy.id] = pos;
         }
     }
 
+    // Força gravação no disco
     file.flush();
 
-    // monta vetor de retorno (posição e título de cada registro)
-    indices.reserve(regs.size());
+    // --------------------------------------------------------
+    // Monta vetor de retorno com as posições dos registros
+    // --------------------------------------------------------
     for (const auto& r : regs) {
         loteReturn lr{};
         lr.id = r.id;
@@ -176,7 +235,13 @@ vector<loteReturn> HashFile::inserirEmLote(const vector<Registro>& regs) {
     return indices;
 }
 
-// busca um registro pelo ID (percorre bucket e overflow)
+// ============================================================
+// buscar()
+// ------------------------------------------------------------
+// Localiza um registro com o ID fornecido, percorrendo o
+// bucket correspondente e, se necessário, as áreas de overflow
+// encadeadas. Retorna true se o registro for encontrado.
+// ============================================================
 bool HashFile::buscar(int id, Registro& encontrado) {
     resetarMetricas();
     fstream file(filePath, ios::in | ios::binary);
@@ -185,7 +250,9 @@ bool HashFile::buscar(int id, Registro& encontrado) {
     const int64_t base = 1LL * hashFunction(id) * bucketSize * regSize();
     Registro temp{};
 
-    // varre o bucket principal
+    // --------------------------------------------------------
+    // Varre o bucket principal
+    // --------------------------------------------------------
     for (int i = 0; i < bucketSize; i++) {
         file.seekg(base + i * regSize(), ios::beg);
         file.read(reinterpret_cast<char*>(&temp), sizeof(Registro));
@@ -198,7 +265,9 @@ bool HashFile::buscar(int id, Registro& encontrado) {
             return true;
         }
 
-        // percorre área de overflow (se houver)
+        // ----------------------------------------------------
+        // Se não encontrado, segue a cadeia de overflow
+        // ----------------------------------------------------
         int64_t prox = temp.prox;
         while (prox != -1) {
             file.seekg(prox, ios::beg);
@@ -218,7 +287,12 @@ bool HashFile::buscar(int id, Registro& encontrado) {
     return false;
 }
 
-// calcula quantos blocos existem no arquivo
+// ============================================================
+// getTotalBlocos()
+// ------------------------------------------------------------
+// Retorna o número total de blocos (registros) armazenados
+// no arquivo de dados, com base em seu tamanho em bytes.
+// ============================================================
 long HashFile::getTotalBlocos() const {
     int64_t bytes = fileSizeBytes();
     if (bytes <= 0) return 0;
