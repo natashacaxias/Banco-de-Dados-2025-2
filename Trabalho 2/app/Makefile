@@ -1,28 +1,28 @@
-
-
-# Compilador e flags
-CXX = g++
+# ----------------------------------------------------------
+# Configuração de compilação
+# ----------------------------------------------------------
+CXX = g++                          # compilador
 CXXFLAGS = -O2 -std=c++17 -I./include
 
-# Diretórios
+# diretórios do projeto
 SRC_DIR = src
 INC_DIR = include
 BIN_DIR = bin
 UTILS_DIR = utils
 DATA_DIR = data
 
-# Programas principais
+# programas principais
 PROGS = upload findrec seek1 seek2
 
 # ==========================================================
-# 🧩 1. BUILD LOCAL (no host)
+#  1. BUILD LOCAL (no host)
 # ==========================================================
 
-# Compila todos os programas principais
+# compila todos os executáveis principais
 build: $(PROGS)
-	@echo "✅ Compilação local concluída."
+	@echo " Compilação local concluída."
 
-# Regras individuais
+# regras específicas de compilação
 upload: $(SRC_DIR)/upload.cpp $(SRC_DIR)/hashfile.cpp $(INC_DIR)/bptreefile.h $(INC_DIR)/common.h
 	$(CXX) $(CXXFLAGS) $^ -o $(BIN_DIR)/$@
 
@@ -35,45 +35,52 @@ seek1: $(SRC_DIR)/seek1.cpp $(SRC_DIR)/hashfile.cpp
 seek2: $(SRC_DIR)/seek2.cpp $(SRC_DIR)/hashfile.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $(BIN_DIR)/$@
 
-# Utilitários auxiliares
+# compila utilitário calcularM
 build-utils:
 	$(CXX) $(CXXFLAGS) $(UTILS_DIR)/calcularM.cpp -o $(UTILS_DIR)/calcularM
-	@echo "✅ Utilitário calcularM compilado."
+	@echo " Utilitário calcularM compilado."
 
 # ==========================================================
-# 🧩 2. EXECUÇÃO LOCAL (sem Docker)
+#  2. EXECUÇÃO LOCAL (sem Docker)
 # ==========================================================
 
+# executa o cálculo da ordem M
 run-calcularM:
-	@echo "🔹 Calculando ordem M da B+Tree..."
+	@echo " Calculando ordem M da B+Tree..."
 	@$(UTILS_DIR)/calcularM
 
+# executa script de correção de CSV
 run-corrigir:
-	@echo "🔹 Corrigindo CSV de entrada..."
+	@echo " Corrigindo CSV de entrada..."
 	python3 $(UTILS_DIR)/corrigir_csv_artigo.py
 
+# faz upload dos dados e cria índices
 run-upload:
-	@echo "🚀 Executando upload (HashFile + B+Tree prim/seg)..."
+	@echo "Executando upload (HashFile + B+Tree prim/seg)..."
 	./$(BIN_DIR)/upload $(DATA_DIR)/artigo_corrigido.csv
 
+# busca direta no arquivo de dados
 run-findrec:
 	@read -p "Digite o ID: " ID; ./$(BIN_DIR)/findrec $$ID
 
+# busca no índice primário (ID)
 run-seek1:
 	@read -p "Digite o ID: " ID; ./$(BIN_DIR)/seek1 $$ID
 
+# busca no índice secundário (Título)
 run-seek2:
 	@read -p "Digite o Título: " TIT; ./$(BIN_DIR)/seek2 "$$TIT"
 
 # ==========================================================
-# 🐳 3. DOCKER BUILD E EXECUÇÃO
+# 3. DOCKER BUILD E EXECUÇÃO
 # ==========================================================
 
+# cria imagem docker chamada 'tp2'
 docker-build:
-	@echo "🐳 Construindo imagem Docker 'tp2'..."
+	@echo " Construindo imagem Docker 'tp2'..."
 	docker build -t tp2 .
 
-# Executa cada programa dentro do container (usa /data montado)
+# executa programas dentro do container (monta /data)
 docker-run-calcularM:
 	docker run --rm -v "$(PWD)/data:/data" tp2 ./utils/calcularM
 
@@ -93,18 +100,20 @@ docker-run-seek2:
 	@read -p "Digite o Título: " TIT; docker run --rm -v "$(PWD)/data:/data" tp2 ./bin/seek2 "$$TIT"
 
 # ==========================================================
-# 🧹 4. LIMPEZA
+#  4. LIMPEZA
 # ==========================================================
 
+# remove binários e arquivos temporários
 clean:
-	@echo "🧹 Limpando binários e arquivos temporários..."
+	@echo " Limpando binários e arquivos temporários..."
 	rm -f $(BIN_DIR)/* $(UTILS_DIR)/*.exe
 	@echo "Limpo."
 
 # ==========================================================
-# 🔎 AJUDA
+# AJUDA
 # ==========================================================
 
+# mostra comandos disponíveis
 help:
 	@echo "Comandos disponíveis:"
 	@echo "  make build              -> Compila os binários locais"
