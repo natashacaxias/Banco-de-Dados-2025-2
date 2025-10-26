@@ -46,11 +46,11 @@ int main(int argc, char* argv[]) {
     bptree.carregarArvore(&bptFile);
     Registro r;
 
-    // prepara a chave para busca (ajusta tamanho e termina com '\0')
+    // prepara a chave para busca 
     Chave chave{};
     memset(chave.data(), 0, sizeof(Chave));
     strncpy(chave.data(), chaveStr.c_str(), sizeof(Chave));
-    //chave.data()[sizeof(Chave)-1] = '\0';
+
 
     // realiza a busca no índice
     cout << "\nRecuperando registro do arquivo de dados..." << endl;

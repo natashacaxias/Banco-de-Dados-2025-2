@@ -230,7 +230,6 @@ struct KeyOps<array<char, N>> {
     static void copy(array<char, N>& dest, const array<char, N>& src) {
         memset(dest.data(), 0, N);
         strncpy(dest.data(), src.data(), N-1);
-        //dest[N-1] = '\0';
     }
 
     static void print(const array<char, N>& k) {
