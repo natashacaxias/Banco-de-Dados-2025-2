@@ -1,21 +1,6 @@
 // ============================================================
 // bptreefile.h
 // ------------------------------------------------------------
-// Implementação da Árvore B+ usada como índice no TP2 de BD1.
-// 
-// A árvore B+ é usada para indexar dados armazenados em disco,
-// permitindo buscas rápidas por chave (ID ou Título) sem ter
-// que percorrer o arquivo inteiro.
-//
-// Este arquivo define:
-//  - A estrutura básica de nó (no)
-//  - O cache de páginas para reduzir leituras/escritas no disco
-//  - As funções de leitura, escrita e divisão de nós
-//  - As operações auxiliares de inserção e manipulação
-//
-// Equipe: Natasha Araújo Caxias, Abel Severo, Ana Carla
-// Professor: Altigran Soares
-// ============================================================
 
 #include <bits/stdc++.h>
 #include "common.h"
@@ -679,3 +664,4 @@ struct bp{
         if (cache) cache->flush();
     }
 };
+
