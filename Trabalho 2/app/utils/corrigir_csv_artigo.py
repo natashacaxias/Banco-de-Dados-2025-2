@@ -1,19 +1,27 @@
 import csv
 import re
+import gzip
+import os
 
-ARQUIVO_ENTRADA = "../data/artigo.csv"
+ARQUIVO_ENTRADA = "../data/artigo.csv.gz"   # agora pode ser .csv ou .csv.gz
 ARQUIVO_SAIDA = "../data/artigo_corrigido.csv"
 ARQUIVO_LOG = "../data/erros_csv.log"
 
+def abrir_arquivo(entrada):
+    """Abre o arquivo normalmente ou descompacta se for .gz"""
+    if entrada.endswith(".gz"):
+        return gzip.open(entrada, 'rt', encoding='utf-8', errors='replace')
+    else:
+        return open(entrada, 'r', encoding='utf-8', errors='replace')
+
 def corrigir_csv(entrada, saida, log, num_campos=7):
-    with open(entrada, 'r', encoding='utf-8', errors='replace') as f_in, \
+    with abrir_arquivo(entrada) as f_in, \
          open(saida, 'w', newline='', encoding='utf-8') as f_out, \
          open(log, 'w', encoding='utf-8') as f_log:
 
         leitor = csv.reader(f_in, delimiter=';', quotechar='"')
         escritor = csv.writer(f_out, delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL)
 
-        buffer = []
         total = 0
         erros = 0
 
@@ -23,9 +31,9 @@ def corrigir_csv(entrada, saida, log, num_campos=7):
                 escritor.writerow(linha)
                 continue
 
-            # 🧩 Se a linha tem campos demais/poucos, tenta reparar
+            # 🧩 Tenta reparar a linha
             texto = ";".join(linha)
-            texto = re.sub(r'\s+', ' ', texto)  # remove quebras de linha dentro do campo
+            texto = re.sub(r'\s+', ' ', texto)
             partes = texto.split(';')
 
             if len(partes) > num_campos:
