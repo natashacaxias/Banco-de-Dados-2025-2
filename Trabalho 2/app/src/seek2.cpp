@@ -9,6 +9,7 @@ using namespace std;
 int main(int argc, char* argv[]) {
     cout << "=== TP2 - Busca por titulo (seek2) ===" << endl;
 
+    // verifica se foi passada a chave (título)
     if (argc < 2) {
         cerr << "Uso: ./bin/seek2 <chave>" << endl;
         return 1;
@@ -21,33 +22,33 @@ int main(int argc, char* argv[]) {
     cout << "Arquivo de dados: " << dbPath << endl;
     cout << "Chave: " << chaveStr << endl;
 
-    // Abre arquivo de índice B+
+    // abre o índice B+ (secundário, por título)
     fstream bptFile(idxPath, ios::in | ios::out | ios::binary);
     if (!bptFile.is_open()) {
         cerr << "Erro ao abrir arquivo de índice B+ para Titulo: " << idxPath << endl;
         return 1;
     }
 
-    // Abre arquivo de dados
+    // abre o arquivo de dados principal
     fstream db(dbPath, ios::in | ios::out | ios::binary);
     if (!db.is_open()) {
         cerr << "Erro ao abrir arquivo de dados: " << dbPath << endl;
         return 1;
     }
 
-    // Define chave como array<char,300>
+    // define tipo da chave (array fixo de 300 chars)
     using Chave = array<char,300>;
     bp<Chave, M_TITULO> bptree;
     bptree.carregarArvore(&bptFile);
     Registro r;
 
-    // Preenche array<char,300> com a chave
+    // prepara a chave para busca (ajusta tamanho e termina com '\0')
     Chave chave{};
     memset(chave.data(), 0, sizeof(Chave));
     strncpy(chave.data(), chaveStr.c_str(), sizeof(Chave));
-    chave.data()[sizeof(Chave)-1] = '\0'; // Garante terminação
+    chave.data()[sizeof(Chave)-1] = '\0';
 
-    // Busca o registro no arquivo de dados
+    // realiza a busca no índice
     cout << "\nRecuperando registro do arquivo de dados..." << endl;
     auto inicioDados = chrono::high_resolution_clock::now();
     
@@ -56,6 +57,7 @@ int main(int argc, char* argv[]) {
     auto fimDados = chrono::high_resolution_clock::now();
     double tempoBuscaDados = chrono::duration<double, milli>(fimDados - inicioDados).count();
 
+    // exibe o resultado encontrado
     if (res.first) {
         cout << "\nRegistro encontrado:\n";
         cout << "ID: " << r.id << "\n";
@@ -69,6 +71,7 @@ int main(int argc, char* argv[]) {
         cout << "\nRegistro nao encontrado no arquivo de dados.\n";
     }
 
+    // mostra estatísticas da busca
     cout << "\nEstatisticas da busca em dados:" << endl;
     cout << "Blocos lidos nos dados: " << res.second << endl;
     cout << "Tempo de busca nos dados: " << tempoBuscaDados << " ms" << endl;
