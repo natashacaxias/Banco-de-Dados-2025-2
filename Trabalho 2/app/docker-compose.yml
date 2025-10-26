@@ -1,14 +1,17 @@
 version: '3.9'
-services:
-  upload:
-    image: tp2
-    build: .
-    volumes:
-      - ./data:/data
-    command: ["./bin/upload", "/data/input.csv"]
 
+services:
+  # serviço responsável por carregar o CSV no sistema
+  upload:
+    image: tp2               # usa a imagem construída com o Dockerfile
+    build: .                 # garante que a imagem seja reconstruída localmente
+    volumes:
+      - ./data:/data         # monta a pasta local "data" dentro do container
+    command: ["./bin/upload", "/data/input.csv"]  # executa o upload
+
+  # serviço para testar a busca direta (findrec)
   findrec:
     image: tp2
     volumes:
-      - ./data:/data
-    command: ["./bin/findrec", "123"]
+      - ./data:/data         # mesmo volume compartilhado com os índices e o data.db
+    command: ["./bin/findrec", "123"]  # exemplo de busca por ID 123
