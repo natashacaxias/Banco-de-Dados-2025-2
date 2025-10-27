@@ -1,34 +1,61 @@
-
-# imagem base recomendada
+# ----------------------------------------------------------
+# Imagem base recomendada (leve e compatível)
+# ----------------------------------------------------------
 FROM debian:bookworm-slim
 
-# instala apenas o necessário para compilação
+# ----------------------------------------------------------
+# Instala compilador C++ e Python 3 (para scripts utilitários)
+# ----------------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      g++ make cmake && \
+      g++ make cmake python3 python3-minimal && \
     rm -rf /var/lib/apt/lists/*
 
-# diretório de trabalho dentro do container
+# ----------------------------------------------------------
+# Diretório de trabalho dentro do container
+# ----------------------------------------------------------
 WORKDIR /app
 
-# copia todos os arquivos do projeto
+# Copia todos os arquivos do projeto
 COPY . /app
 
-# compila usando o Makefile padrão
+# ----------------------------------------------------------
+# Compila os programas C++ com Makefile
+# ----------------------------------------------------------
 RUN make build
-
-# diretório para dados persistentes (montado em runtime)
+RUN make build-utils
+# ----------------------------------------------------------
+# Diretório de dados persistentes (montado como volume)
+# ----------------------------------------------------------
 VOLUME ["/data"]
 
-# variáveis de ambiente para facilitar testes
-# CSV_GZ          = arquivo original compactado
-# CSV_CORRIGIDO   = arquivo limpo gerado pelo script corrigir_csv_artigo.py
-# DATA_DIR        = onde ficam data.db e os índices .idx
-# LOG_LEVEL       = nível de log desejado (error|warn|info|debug)
+# ----------------------------------------------------------
+# Variáveis de ambiente úteis
+# ----------------------------------------------------------
+# CSV_GZ        = arquivo original compactado (.gz)
+# CSV_CORRIGIDO = arquivo limpo gerado pelo script Python
+# DATA_DIR      = onde ficam data.db e índices .idx
+# LOG_LEVEL     = nível de log dos binários (error|warn|info|debug)
 ENV CSV_GZ=/data/artigo.csv.gz \
     CSV_CORRIGIDO=/data/artigo_corrigido.csv \
     DATA_DIR=/data \
     LOG_LEVEL=info
 
-# comando padrão (orientativo)
-# conforme a especificação mínima, apenas exibe instruções
-CMD ["bash", "-lc", "echo 'Passo 1: python3 utils/corrigir_csv_artigo.py   # gera /data/artigo_corrigido.csv a partir de /data/artigo.csv.gz'; echo 'Passo 2: ./bin/upload /data/artigo_corrigido.csv   # cria data.db e índices B+'; echo ''; echo 'Busca direta no hash:      ./bin/findrec <ID>'; echo 'Busca no índice primário:  ./bin/seek1 <ID>'; echo 'Busca no índice secundário ./bin/seek2 \"<TITULO>\"'; echo ''; echo 'Binários disponíveis:'; ls -l bin/"]
+# ----------------------------------------------------------
+# Comando padrão (orientativo para o avaliador)
+# ----------------------------------------------------------
+CMD ["bash", "-lc", "\
+echo '=== TP2 – Banco de Dados I (UFAM) ==='; \
+echo ''; \
+echo 'Passo 1: python3 utils/corrigir_csv_artigo.py /data/artigo.csv.gz'; \
+echo '         -> gera /data/artigo_corrigido.csv'; \
+echo ''; \
+echo 'Passo 2: ./bin/upload /data/artigo_corrigido.csv'; \
+echo '         -> cria /data/data.db e índices B+'; \
+echo ''; \
+echo 'Outros comandos:'; \
+echo '  ./bin/findrec <ID>                (busca direta no hash)'; \
+echo '  ./bin/seek1 <ID>                  (busca via índice primário)'; \
+echo '  ./bin/seek2 \"<Título>\"           (busca via índice secundário)'; \
+echo ''; \
+echo 'Binários disponíveis:'; \
+ls -l bin/"]

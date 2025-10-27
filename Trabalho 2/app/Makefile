@@ -1,3 +1,13 @@
+# ==========================================================
+# CORREÇÃO DE ARGUMENTOS COM ESPAÇOS E DOIS PONTOS (:)
+# ==========================================================
+# Esta regra coringa impede que o make interprete argumentos como "targets".
+# Assim, comandos como:
+#   make docker-run-seek2 "Poster: 3D sketching ..."
+# funcionam normalmente sem precisar de "--".
+%:
+	@:
+
 # ----------------------------------------------------------
 # Configuração de compilação
 # ----------------------------------------------------------
@@ -20,7 +30,7 @@ PROGS = upload findrec seek1 seek2
 
 # compila todos os executáveis principais
 build: $(PROGS)
-	@echo " Compilação local concluída."
+	@echo "Compilação local concluída."
 
 # regras específicas de compilação
 upload: $(SRC_DIR)/upload.cpp $(SRC_DIR)/hashfile.cpp $(INC_DIR)/bptreefile.h $(INC_DIR)/common.h
@@ -38,7 +48,7 @@ seek2: $(SRC_DIR)/seek2.cpp $(SRC_DIR)/hashfile.cpp
 # compila utilitário calcularM
 build-utils:
 	$(CXX) $(CXXFLAGS) $(UTILS_DIR)/calcularM.cpp -o $(UTILS_DIR)/calcularM
-	@echo " Utilitário calcularM compilado."
+	@echo "Utilitário calcularM compilado."
 
 # ==========================================================
 #  2. EXECUÇÃO LOCAL (sem Docker)
@@ -46,13 +56,17 @@ build-utils:
 
 # executa o cálculo da ordem M
 run-calcularM:
-	@echo " Calculando ordem M da B+Tree..."
+	@echo "Calculando ordem M da B+Tree..."
 	@$(UTILS_DIR)/calcularM
 
-# executa script de correção de CSV
+# executa script de correção de CSV (recebe arquivo como argumento)
 run-corrigir:
-	@echo " Corrigindo CSV de entrada..."
-	python3 $(UTILS_DIR)/corrigir_csv_artigo.py
+	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
+		echo "Uso: make run-corrigir <arquivo.csv>"; exit 1; \
+	fi; \
+	FILE=$(filter-out $@,$(MAKECMDGOALS)); \
+	echo "Corrigindo arquivo: $(DATA_DIR)/$$FILE"; \
+	python3 $(UTILS_DIR)/corrigir_csv_artigo.py "$(DATA_DIR)/$$FILE"
 
 # faz upload dos dados e cria índices
 run-upload:
@@ -75,68 +89,92 @@ run-seek2:
 # 3. DOCKER BUILD E EXECUÇÃO
 # ==========================================================
 
-# cria imagem docker chamada 'tp2'
 docker-build:
-	@echo " Construindo imagem Docker 'tp2'..."
+	@echo "Construindo imagem Docker 'tp2'..."
 	docker build -t tp2 .
 
-# executa programas dentro do container (monta /data)
 docker-run-calcularM:
 	docker run --rm -v "$(PWD)/data:/data" tp2 ./utils/calcularM
 
+# executa o script Python de correção dentro do container
 docker-run-corrigir:
-	docker run --rm -v "$(PWD)/data:/data" tp2 python3 ./utils/corrigir_csv_artigo.py
+	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
+		echo "Uso: make docker-run-corrigir <arquivo.csv>"; exit 1; \
+	fi; \
+	FILE=$(filter-out $@,$(MAKECMDGOALS)); \
+	echo "Corrigindo arquivo dentro do Docker: $$FILE"; \
+	docker run --rm -v "$(PWD)/data:/data" tp2 python3 ./utils/corrigir_csv_artigo.py "/data/$$FILE"
+
+docker-run-upload:
+	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
+		echo "Uso: make docker-run-upload <arquivo.csv>"; exit 1; \
+	fi; \
+	FILE=$(filter-out $@,$(MAKECMDGOALS)); \
+	docker run --rm -e LOG_LEVEL=$${LOG_LEVEL:-info} \
+		-v "$(PWD)/data:/data" tp2 ./bin/upload "/data/$${FILE}"
 
 docker-run-findrec:
 	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
 		echo "Uso: make docker-run-findrec <ID>"; exit 1; \
 	fi; \
 	ID=$(filter-out $@,$(MAKECMDGOALS)); \
-	docker run --rm -v "$(PWD)/data:/data" tp2 ./bin/findrec $$ID
+	docker run --rm -e LOG_LEVEL=$${LOG_LEVEL:-info} \
+		-v "$(PWD)/data:/data" tp2 ./bin/findrec $$ID
 
 docker-run-seek1:
 	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
 		echo "Uso: make docker-run-seek1 <ID>"; exit 1; \
 	fi; \
 	ID=$(filter-out $@,$(MAKECMDGOALS)); \
-	docker run --rm -v "$(PWD)/data:/data" tp2 ./bin/seek1 $$ID
+	docker run --rm -e LOG_LEVEL=$${LOG_LEVEL:-info} \
+		-v "$(PWD)/data:/data" tp2 ./bin/seek1 $$ID
 
 docker-run-seek2:
 	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
 		echo "Uso: make docker-run-seek2 <Título>"; exit 1; \
 	fi; \
-	TITULO=$(filter-out $@,$(MAKECMDGOALS)); \
-	docker run --rm -v "$(PWD)/data:/data" tp2 ./bin/seek2 "$$TITULO"
-
+	TITULO="$(shell echo $(filter-out $@,$(MAKECMDGOALS)))"; \
+	docker run --rm -e LOG_LEVEL=$${LOG_LEVEL:-info} \
+		-v "$(PWD)/data:/data" tp2 ./bin/seek2 "$$TITULO"
 
 # ==========================================================
 #  4. LIMPEZA
 # ==========================================================
 
-# remove binários e arquivos temporários
 clean:
-	@echo " Limpando binários e arquivos temporários..."
+	@echo "Limpando binários e arquivos temporários..."
 	rm -f $(BIN_DIR)/* $(UTILS_DIR)/*.exe
+	@echo "Limpo."
+
+clean-data:
+	@echo "Removendo arquivos de dados e índices..."
+	rm -f $(DATA_DIR)/*.db $(DATA_DIR)/*.idx $(DATA_DIR)/*.log
 	@echo "Limpo."
 
 # ==========================================================
 # AJUDA
 # ==========================================================
 
-# mostra comandos disponíveis
 help:
 	@echo "Comandos disponíveis:"
 	@echo "  make build              -> Compila os binários locais"
 	@echo "  make build-utils        -> Compila calcularM"
 	@echo "  make run-calcularM      -> Mostra M_ID e M_TITULO"
-	@echo "  make run-corrigir       -> Corrige CSV"
+	@echo "  make run-corrigir FILE  -> Corrige CSV (ex: artigo.csv)"
 	@echo "  make run-upload         -> Executa upload local"
 	@echo "  make run-findrec        -> Busca por ID nos dados"
 	@echo "  make run-seek1          -> Busca por ID no índice primário"
 	@echo "  make run-seek2          -> Busca por título no índice secundário"
 	@echo ""
 	@echo "  make docker-build       -> Constrói imagem Docker"
-	@echo "  make docker-run-upload  -> Executa upload dentro do container"
-	@echo "  make docker-run-findrec -> Executa findrec no container"
+	@echo "  make docker-run-corrigir FILE -> Corrige CSV no container"
+	@echo "  make docker-run-upload FILE   -> Executa upload no container"
+	@echo "  make docker-run-findrec ID    -> Executa findrec no container"
+	@echo "  make docker-run-seek1 ID      -> Executa seek1 no container"
+	@echo "  make docker-run-seek2 TITULO  -> Executa seek2 no container"
 	@echo ""
 	@echo "  make clean              -> Limpa binários"
+	@echo "  make clean-data         -> Remove data.db e índices"
+	@echo ""
+	@echo "  Variável opcional de log: LOG_LEVEL=error|warn|info|debug"
+	@echo "  Exemplo: make docker-run-findrec 532 LOG_LEVEL=debug"

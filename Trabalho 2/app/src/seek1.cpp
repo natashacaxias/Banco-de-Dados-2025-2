@@ -14,6 +14,8 @@
 #include <fstream>
 #include "../include/bptreefile.h"
 #include "../include/common.h"
+#include "../include/logger.h" // ✅ adicionado
+
 using namespace std;
 
 // ============================================================
@@ -26,71 +28,62 @@ using namespace std;
 //   docker run --rm -v $(pwd)/data:/data tp2 ./bin/seek1 532
 // ============================================================
 int main(int argc, char* argv[]) {
+    Logger log; // logger com controle por LOG_LEVEL
     auto inicioTotal = chrono::high_resolution_clock::now();
 
-    cout << "\n=== TP2 – Busca por ID (seek1) ===\n" << endl;
+    log.info("=== TP2 – Busca por ID (seek1) ===");
 
     // --------------------------------------------------------
     // Validação dos argumentos
     // --------------------------------------------------------
-    // O programa exige um ID como argumento de entrada.
-    // Caso não seja fornecido, exibe instrução de uso.
     if (argc < 2) {
-        cerr << "Uso: ./bin/seek1 <ID>" << endl;
+        log.error("Uso: ./bin/seek1 <ID>");
         return 1;
     }
 
     // --------------------------------------------------------
     // Inicialização dos caminhos e parâmetros
     // --------------------------------------------------------
-    string chaveStr = argv[1];            // ID fornecido como string
-    string dbPath = "/data/data.db";      // caminho do arquivo de dados
-    string idxPath = "/data/bptreeId.idx"; // caminho do índice primário (B+Tree)
+    string chaveStr = argv[1];
+    string dbPath = "/data/data.db";
+    string idxPath = "/data/bptreeId.idx";
 
-    cout << "Arquivo de dados: " << dbPath << endl;
-    cout << "Arquivo de índices: " << idxPath << endl;
-    cout << "Chave: " << chaveStr << endl;
+    log.info("Arquivo de dados: " + dbPath);
+    log.info("Arquivo de índices: " + idxPath);
+    log.info("Chave: " + chaveStr);
 
     // ========================================================
     // Etapa 1: Abertura dos arquivos necessários
     // ========================================================
-
-    // --------------------------------------------------------
-    // Abre o arquivo de índice B+ (índice primário por ID)
-    // --------------------------------------------------------
     fstream bptFile(idxPath, ios::in | ios::out | ios::binary);
     if (!bptFile.is_open()) {
-        cerr << "Erro ao abrir arquivo de índice B+ primário: " << idxPath << endl;
+        log.error("Erro ao abrir arquivo de índice B+ primário: " + idxPath);
         return 1;
     }
 
-    // --------------------------------------------------------
-    // Abre o arquivo de dados principal (hashfile)
-    // --------------------------------------------------------
     fstream db(dbPath, ios::in | ios::out | ios::binary);
     if (!db.is_open()) {
-        cerr << "Erro ao abrir arquivo de dados: " << dbPath << endl;
+        log.error("Erro ao abrir arquivo de dados: " + dbPath);
         return 1;
     }
 
     // ========================================================
     // Etapa 2: Carrega a B+Tree e prepara a busca
     // ========================================================
-
-    // Instancia a árvore B+ e carrega sua estrutura do disco
+    log.debug("Carregando estrutura da B+Tree a partir do disco...");
     bp<int, M_ID> bptree;
     bptree.carregarArvore(&bptFile);
 
-    Registro r; // estrutura de saída
-    int id = stoi(chaveStr); // converte o argumento para inteiro
+    Registro r;
+    int id = stoi(chaveStr);
+    log.debug("ID convertido para inteiro: " + to_string(id));
 
     // ========================================================
     // Etapa 3: Busca no índice e leitura do registro
     // ========================================================
-    cout << "\nRecuperando registro do arquivo de dados..." << endl;
+    log.info("Recuperando registro do arquivo de dados...");
     auto inicioBusca = chrono::high_resolution_clock::now();
 
-    // Executa a busca na árvore B+ (usa o índice para acessar o arquivo de dados)
     pair<bool, long> res = bptree.buscar(id, r, &db);
 
     auto fimBusca = chrono::high_resolution_clock::now();
@@ -100,7 +93,7 @@ int main(int argc, char* argv[]) {
     // Etapa 4: Exibição do resultado da busca
     // ========================================================
     if (res.first) {
-        cout << "\nRegistro encontrado:\n";
+        log.info("Registro encontrado:");
         cout << "ID: " << r.id << "\n";
         cout << "Título: " << r.titulo.data() << "\n";
         cout << "Ano: " << r.ano << "\n";
@@ -109,15 +102,16 @@ int main(int argc, char* argv[]) {
         cout << "Atualização: " << r.data_atualizacao << "\n";
         cout << "Snippet: " << r.snippet << "\n";
     } else {
-        cout << "\nRegistro não encontrado no arquivo de dados.\n";
+        log.warn("Registro não encontrado no arquivo de dados.");
     }
 
     // ========================================================
     // Etapa 5: Estatísticas de desempenho
     // ========================================================
-    cout << "\nEstatísticas da busca:" << endl;
+    log.info("Estatísticas da busca:");
     cout << "  Blocos lidos no índice: " << res.second << endl;
-    cout << "  Tempo de busca: " << tempoBusca << " ms" << endl;
+    cout << "  Tempo de busca: " << fixed << setprecision(3)
+         << tempoBusca << " ms" << endl;
     cout << "  Total de blocos no índice: " << bptree.contarBlocos() << endl;
 
     // ========================================================
@@ -126,10 +120,11 @@ int main(int argc, char* argv[]) {
     auto fimTotal = chrono::high_resolution_clock::now();
     double tempoTotal = chrono::duration<double, milli>(fimTotal - inicioTotal).count();
 
-    cout << "\nEstatísticas gerais:" << endl;
+    log.info("Estatísticas gerais:");
     cout << fixed << setprecision(2);
     cout << "  Tempo total de execução: " << tempoTotal << " ms" << endl;
-    cout << "  Total de blocos no arquivo: " << bptree.contarBlocos() << "\n" << endl;
+    cout << "  Total de blocos no arquivo: " << bptree.contarBlocos() << endl;
 
+    log.debug("Execução concluída com sucesso.");
     return 0;
 }
